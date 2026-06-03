@@ -640,6 +640,31 @@ body {
 .res-bar { flex: 1; height: 9px; background: rgba(255,255,255,0.06); border-radius: 999px; overflow: hidden; }
 .res-fill { height: 100%; border-radius: 999px; transition: width .3s ease; }
 
+/* 딜 최적화 — 메커니즘 카드 + 코어 기프트 */
+.mech-card { background: rgba(0,0,0,0.22); border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; margin: 6px 0 10px; }
+.mech-row { font-size: 0.86rem; margin: 3px 0; line-height: 1.45; }
+.mech-row b { display: inline-block; min-width: 52px; color: var(--muted); font-weight: 700; margin-right: 4px; }
+.mech-row.warn b { color: var(--bad); } .mech-row.warn { color: #e0b6b6; }
+.mech-row.tip b { color: var(--accent); } .mech-row.tip { color: #f0e0c0; }
+.core-h2 { font-family: "kotra_bold","Malgun Gothic",sans-serif; font-size: 0.95rem; margin: 8px 0 6px; }
+.core-roles { display: flex; flex-wrap: wrap; gap: 12px; }
+.core-col { flex: 1; min-width: 150px; }
+.core-h { font-size: 0.82rem; font-weight: 700; color: var(--muted); margin-bottom: 4px; border-bottom: 1px solid var(--border); padding-bottom: 3px; }
+.core-h.need { color: #f4d98c; }
+.core-frag { margin-top: 10px; }
+.core-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.core-gift {
+  display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 7px;
+  padding: 3px 7px 3px 3px; margin: 2px 4px 2px 0; font-size: 0.8rem; transition: border-color .12s, background .12s;
+}
+.core-gift:hover { border-color: var(--accent); background: rgba(200,162,74,0.10); }
+.core-gift .gift-icon.xs { width: 26px; height: 26px; }
+.cg-name { word-break: keep-all; }
+.cg-t { color: var(--accent); font-weight: 700; }
+.dmg-tips { margin: 4px 0 0; padding-left: 18px; font-size: 0.88rem; line-height: 1.6; }
+.dmg-tips li { margin: 4px 0; }
+
 .footer {
   text-align: center;
   color: var(--muted);

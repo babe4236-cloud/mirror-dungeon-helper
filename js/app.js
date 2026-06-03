@@ -979,6 +979,10 @@ if (typeof SINNERS !== "undefined") {
 /* =============================================================
  *  ④ 딜 최적화 — 역할 균형 진단
  * ============================================================= */
+const giftTierVal = (g) => g.ex ? 6 : (g.tier || 0);
+// 작은 클릭형 기프트 칩 (기프트 모달로 이동)
+const coreGiftChip = (g) => `<span class="goto-gift core-gift" data-goto="${escAttr(g.name)}">${giftThumb(g, "xs")}<span class="cg-name">${esc(g.name)}</span><small class="cg-t">${g.ex ? "EX" : "T" + g.tier}</small></span>`;
+
 el("damage-run").addEventListener("click", () => {
   const picked = selectedChips("damage-keywords");
   const out = el("damage-result");
@@ -987,29 +991,57 @@ el("damage-run").addEventListener("click", () => {
     return;
   }
 
-  const blocks = picked.map((kw) => {
+  // 키워드별: 메커니즘 카드 + 역할별 코어 기프트 + 취약 부여
+  const kwBlocks = picked.map((kw) => {
+    const m = KEYWORD_MECH[kw];
     const rule = SYNERGY_RULES[kw];
-    const owned = MD_GIFTS.filter((g) => g.keywords.includes(kw));
-    const haveRoles = new Set(owned.map((g) => g.role));
-    const missing = rule ? rule.needs.filter((r) => !haveRoles.has(r)) : [];
-
-    const status = missing.length
-      ? `<span class="warn">⚠ 누락된 역할: ${missing.join(", ")}</span>`
-      : `<span class="ok">✔ 핵심 역할 충족</span>`;
-
-    const list = owned.length
-      ? owned.map((g) => `<div class="rank-item rank-flex">${giftThumb(g, "sm")}<div><b>${esc(g.name)}</b> <span class="badge">${esc(g.role)}</span><br/><small>${esc(g.effect)}</small></div></div>`).join("")
-      : `<p class="empty">데이터에 ${kw} 기프트가 없습니다.</p>`;
-
+    const pool = MD_GIFTS.filter((g) => g.keywords.includes(kw));
+    const roleCols = ["부여", "발동", "증폭"].map((r) => {
+      const gs = pool.filter((g) => g.role === r).sort((a, b) => giftTierVal(b) - giftTierVal(a)).slice(0, 4);
+      if (!gs.length) return "";
+      const need = rule && rule.needs.includes(r);
+      return `<div class="core-col"><div class="core-h${need ? " need" : ""}">${r}${need ? " ★" : ""}</div>${gs.map(coreGiftChip).join("")}</div>`;
+    }).join("");
+    const fragile = pool.filter((g) => /취약/.test(g.effect)).sort((a, b) => giftTierVal(b) - giftTierVal(a)).slice(0, 5);
+    const fragileRow = fragile.length
+      ? `<div class="core-frag"><div class="core-h">＋ 취약 부여 (범용 증뎀)</div>${fragile.map(coreGiftChip).join("")}</div>` : "";
     return `<div class="result-block">
-      <h3>${kw}</h3>
-      <p class="hint">${rule ? esc(rule.tip) : ""}</p>
-      <p>${status}</p>
-      ${list}
+      <h3><img class="kwt-ic" src="assets/keywords/${encodeURIComponent(kw)}.webp" onerror="this.style.display='none'"> ${esc(kw)} <span class="meta">딜 최적화</span></h3>
+      ${m ? `<div class="mech-card">
+        <div class="mech-row"><b>딜 방식</b> ${esc(m.how)}</div>
+        <div class="mech-row"><b>특징</b> ${esc(m.trait)}</div>
+        <div class="mech-row warn"><b>약점</b> ${esc(m.weak)}</div>
+        <div class="mech-row tip"><b>최적화</b> ${esc(m.tip)}</div>
+      </div>` : ""}
+      <div class="core-h2">핵심 코어 기프트 <small class="meta">(역할별 상위 티어 · ★=이 빌드 필수 역할)</small></div>
+      <div class="core-roles">${roleCols}</div>
+      ${fragileRow}
     </div>`;
   }).join("");
 
-  out.innerHTML = blocks;
+  // 범용 증뎀 레버 (빌드 무관)
+  const leverRows = DMG_LEVERS.map((lv) => {
+    const re = new RegExp(lv.find);
+    const egs = MD_GIFTS.filter((g) => re.test(g.effect)).sort((a, b) => giftTierVal(b) - giftTierVal(a)).slice(0, 5);
+    return `<div class="rank-item">
+      <b>${esc(lv.name)}</b> <span class="rar">${lv.power}</span>
+      <p class="hint" style="margin:3px 0">${esc(lv.desc)}</p>
+      <div class="core-chips">${egs.map(coreGiftChip).join("") || '<small class="meta">관련 기프트 없음</small>'}</div>
+    </div>`;
+  }).join("");
+
+  out.innerHTML = `
+    <div class="result-block"><h3>⚡ 범용 증뎀 (빌드 무관)</h3>
+      <p class="hint">데미지 = <b>코인값 × (1+정적배율) × (1+동적배율)</b>. 아래는 어떤 상태이상 빌드든 곱연산으로 들어가는 핵심 레버입니다. 칩을 누르면 기프트 상세로 이동.</p>
+      ${leverRows}</div>
+    ${kwBlocks}
+    <div class="result-block"><h3>🔮 조합·내성 팁</h3>
+      <ul class="dmg-tips">
+        <li><b>합성으로 덱 굳히기</b> — 기프트 3개 합성 시 원하는 키워드가 <b>90%</b>(2개는 60%). 코어 키워드는 합성으로 모으세요.</li>
+        <li><b>적 내성 대응</b> — 적이 약한 <b>공격타입(참격/관통/타격)</b>으로 때리고, 그 위에 <b>취약</b>을 깔면 곱연산으로 폭딜. 파티 추천 탭의 공격타입 칩으로 인격을 맞추세요.</li>
+        <li><b>교착(스태거) 주의</b> — 출혈·파열은 교착된 적에게 피해가 안 들어갑니다. 폭발 타이밍을 교착 전/후로 조절하세요.</li>
+        <li><b>비용 관리</b> — 상점에서 기프트 강화·교체로 코어 기프트의 티어를 올리면 딜이 크게 상승합니다.</li>
+      </ul></div>`;
 });
 
 /* =============================================================
