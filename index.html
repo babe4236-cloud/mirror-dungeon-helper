@@ -7,6 +7,10 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
+  <!-- 거울던전 분위기 배경: 코스믹 성운 그라데이션 + 별하늘/별똥별 캔버스 -->
+  <div id="lc-bg" aria-hidden="true"></div>
+  <canvas id="lc-embers" aria-hidden="true"></canvas>
+
   <header class="topbar">
     <h1><span class="lc-emblem"></span><span class="lc-title">거울던전 도우미</span></h1>
     <p class="subtitle">림버스컴퍼니 · 기프트 / 사건 Q&amp;A / 카드팩 / 조합식 / 수감자 / 파티 추천 / 딜 최적화</p>
@@ -25,28 +29,40 @@
   <main class="container">
     <!-- ① 기프트 검색 -->
     <section id="tab-gifts" class="panel active">
-      <div class="filters">
-        <input type="search" id="gift-search" placeholder="기프트 이름·효과 검색..." />
-        <select id="gift-sin">
-          <option value="">전체 죄악</option>
-        </select>
-        <select id="gift-keyword">
-          <option value="">전체 키워드</option>
-        </select>
-        <select id="gift-role">
-          <option value="">전체 역할</option>
-          <option value="부여">부여</option>
-          <option value="발동">발동</option>
-          <option value="증폭">증폭</option>
-          <option value="유틸">유틸</option>
-        </select>
-        <select id="gift-tier">
-          <option value="">전체 등급</option>
-        </select>
+      <div class="sinner-filters">
+        <div class="filter-top">
+          <input type="search" id="gift-search" class="ys-search" placeholder="기프트 이름·효과 검색..." />
+          <select id="gift-sort" class="ys-select" title="정렬">
+            <option value="tier">티어 높은순</option>
+            <option value="cost-desc">가격 높은순</option>
+            <option value="cost-asc">가격 낮은순</option>
+            <option value="name">이름순</option>
+          </select>
+        </div>
+        <div class="filter-row" id="gift-kw-filters"></div>
+        <div class="filter-row" id="gift-sin-filters"></div>
+        <div class="filter-row">
+          <span id="gift-role-filters" class="fbtn-group"></span>
+          <span id="gift-tier-filters" class="fbtn-group"></span>
+        </div>
+        <div class="filter-row" id="gift-diff-filters"></div>
+        <div class="filter-row gift-toolbar">
+          <button class="mini-toggle" id="gift-kw-mode" data-mode="or" title="키워드 여러 개 선택 시 조합 방식">키워드 OR</button>
+          <button class="mini-toggle" id="gift-fav-only">⭐ 즐겨찾기만</button>
+          <button class="mini-btn" id="gift-reset">필터 초기화</button>
+        </div>
       </div>
       <p class="count" id="gift-count"></p>
-      <div class="cards" id="gift-list"></div>
+      <div id="gift-list" class="gift-gallery"></div>
     </section>
+
+    <!-- 기프트 상세 모달 -->
+    <div id="gift-modal" class="modal-overlay">
+      <div class="modal-box">
+        <button class="modal-close" id="gift-modal-close">✕</button>
+        <div class="sm-body"></div>
+      </div>
+    </div>
 
     <!-- ② 사건 Q&A -->
     <section id="tab-events" class="panel">

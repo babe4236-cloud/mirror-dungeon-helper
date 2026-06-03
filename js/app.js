@@ -17,38 +17,74 @@ const el = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 const thumb = (src, cls = "thumb") =>
   src ? `<img class="${cls}" src="${esc(src)}" alt="" loading="lazy" onerror="this.style.display='none'">` : "";
+const activeFilterVal = (id) => { const b = el(id).querySelector(".filter-btn.on"); return b ? b.dataset.val : ""; };
+const activeFilterVals = (id) => [...el(id).querySelectorAll(".filter-btn.on")].map((b) => b.dataset.val);
 
 /* 키워드 하이라이트(아이콘+강조) + 툴팁 */
 const escAttr = (s) => esc(s).replace(/"/g, "&quot;");
-let KW_RE = null;
 const KW_MAP = new Map();
 // 일반어와 겹쳐 오매칭되는 키워드 제외 (예: "소수점 버림"의 '버림')
 const KW_BLACKLIST = new Set(["버림", "부하", "화력", "해금", "영감"]);
+// 수치 패턴: +10%, -2, 3, 0.5% 등
+const NUM_PAT = "[+\\-]?\\d+(?:\\.\\d+)?%?";
+let INLINE_RE = new RegExp("()(" + NUM_PAT + ")", "g"); // 키워드 없을 때: 수치만
 if (typeof KEYWORD_INFO !== "undefined" && KEYWORD_INFO.length) {
   const list = KEYWORD_INFO.filter((k) => !KW_BLACKLIST.has(k.name));
   for (const k of list) KW_MAP.set(k.name, k);
   const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  KW_RE = new RegExp("(" + list.map((k) => escRe(k.name)).join("|") + ")", "g");
+  const KW_ALT = list.map((k) => escRe(k.name)).join("|");
+  // 키워드 + 수치를 단일 패스로 처리 (속성값 손상 방지 위해 평문에서만 실행)
+  INLINE_RE = new RegExp("(" + KW_ALT + ")|(" + NUM_PAT + ")", "g");
 }
+/* 키워드(아이콘+강조+툴팁) & 수치(굵게) 동시 하이라이트 — 이스케이프된 평문 입력 */
 function highlightKeywords(escaped) {
-  if (!KW_RE) return escaped;
-  return escaped.replace(KW_RE, (m) => {
-    const k = KW_MAP.get(m);
-    if (!k) return m;
-    const icon = `<img class="kwt-ic" src="assets/keywords/${encodeURIComponent(k.name)}.webp" alt="" onerror="this.style.display='none'">`;
-    const desc = k.desc ? ` data-desc="${escAttr(k.desc)}"` : "";
-    return `<span class="kwt"${desc}>${icon}${m}</span>`;
+  return escaped.replace(INLINE_RE, (m, kw, num) => {
+    if (kw) {
+      const k = KW_MAP.get(kw);
+      if (!k) return kw;
+      const icon = `<img class="kwt-ic" src="assets/keywords/${encodeURIComponent(k.name)}.webp" alt="" onerror="this.style.display='none'">`;
+      const desc = k.desc ? ` data-desc="${escAttr(k.desc)}"` : "";
+      return `<span class="kwt"${desc}>${icon}${kw}</span>`;
+    }
+    if (num) return `<b class="eff-num">${num}</b>`;
+    return m;
   });
 }
 
-/* 효과 설명을 문단·하위항목(- )으로 구분해 렌더 + 키워드 하이라이트 */
-function formatEffect(text) {
+// 조건절 종결 마커(이 단어 + 쉼표 = 「조건, 결과」 경계)
+const COND_RE = /^(.{4,}?(?:할 경우|일 경우|인 경우|경우|때|시|다면|라면|으면|하면|되면|이라면|았다면|였다면))[,，]\s*(.+)$/;
+
+/* 한 줄 렌더: 조건→결과 분리(structured) 지원 */
+function effLine(t, structured) {
+  if (/^[-·•]/.test(t)) return `<div class="eff-line eff-sub">${highlightKeywords(esc(t.replace(/^[-·•]\s*/, "")))}</div>`;
+  if (structured) {
+    const cm = t.match(COND_RE);
+    if (cm && cm[2].length >= 2) {
+      return `<div class="eff-line eff-cond-line"><span class="eff-cond">${highlightKeywords(esc(cm[1]))}</span><span class="eff-do"><span class="eff-arrow">→</span>${highlightKeywords(esc(cm[2]))}</span></div>`;
+    }
+  }
+  return `<div class="eff-line">${highlightKeywords(esc(t))}</div>`;
+}
+
+/* 효과 설명 렌더 + 키워드/수치 하이라이트.
+ * structured=true(기프트/스킬): 문단별 강화·공명 라벨 + 조건→결과 분리.
+ * structured=false(사건 본문 등 산문): 기존 줄 단위 렌더. */
+function formatEffect(text, structured = false) {
   if (!text) return "";
-  return text.split("\n").map((line) => {
-    const t = line.trim();
-    if (!t) return '<div class="eff-gap"></div>';
-    if (/^[-·•]/.test(t)) return `<div class="eff-line eff-sub">${highlightKeywords(esc(t.replace(/^[-·•]\s*/, "")))}</div>`;
-    return `<div class="eff-line">${highlightKeywords(esc(t))}</div>`;
+  if (!structured) {
+    return text.split("\n").map((line) => {
+      const t = line.trim();
+      if (!t) return '<div class="eff-gap"></div>';
+      return effLine(t, false);
+    }).join("");
+  }
+  const blocks = text.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
+  return blocks.map((block) => {
+    const tag = /공명/.test(block) ? `<span class="eff-tag res">⚡ 공명</span>`
+      : /강화되어|효과가\s*강화/.test(block) ? `<span class="eff-tag enh">⚡ 강화</span>` : "";
+    const body = block.split("\n").map((s) => s.trim()).filter(Boolean)
+      .map((t) => effLine(t, true)).join("");
+    return `<div class="eff-block">${tag}${body}</div>`;
   }).join("");
 }
 
@@ -85,6 +121,10 @@ if (typeof RECIPES !== "undefined") {
 /* 조합식 재료/결과를 우리 기프트 데이터와 이름으로 연결해 등급·키워드 오버레이 */
 const giftByName = new Map();
 if (typeof GIFTS !== "undefined") for (const g of GIFTS) giftByName.set(normName(g.name), g);
+/* 정상 거울던전 E.G.O 기프트(티어 I~V)만. 티어 0은 테마팩/사건 전용 특수
+ * 아이템(입장권·증표·매듭·꿈·장난감·동전 등)이라 검색/추천에서 제외.
+ * (giftByName에는 남겨두어 조합식·사건 링크는 계속 해석됨) */
+const MD_GIFTS = (typeof GIFTS !== "undefined" ? GIFTS : []).filter((g) => g.tier > 0 || g.ex);
 function recipeThumb(it, cls = "") {
   const g = giftByName.get(normName(it.name));
   if (g && g.img) return giftThumb({ img: it.img || g.img, tier: g.tier, keywords: g.keywords }, cls);
@@ -144,60 +184,152 @@ function fillSelect(select, items) {
 /* =============================================================
  *  ① 기프트 검색
  * ============================================================= */
-fillSelect(el("gift-sin"), SINS);
-// 키워드/등급은 실제 데이터에서 동적으로 채움(공격타입·고등급 포함)
-fillSelect(el("gift-keyword"), [...new Set(GIFTS.flatMap((g) => g.keywords))].sort());
-fillSelect(el("gift-tier"), [...new Set(GIFTS.map((g) => g.tier))].filter(Boolean).sort()
-  .map((t) => String(t)));
+// 필터 버튼 (키워드 / 죄악 / 역할 / 등급 / 출현난이도)
+el("gift-kw-filters").innerHTML = [...new Set(MD_GIFTS.flatMap((g) => g.keywords))].filter(Boolean).sort()
+  .map((k) => `<button class="filter-btn" data-val="${esc(k)}"><img class="fb-ic" src="assets/keywords/${encodeURIComponent(k)}.webp" onerror="this.style.display='none'">${esc(k)}</button>`).join("");
+el("gift-sin-filters").innerHTML = SINS.map((s) => `<button class="filter-btn" data-val="${esc(s)}"><img class="fb-ic" src="assets/sin/${encodeURIComponent(s)}.png" onerror="this.style.display='none'">${esc(s)}</button>`).join("");
+el("gift-role-filters").innerHTML = ["부여", "발동", "증폭", "유틸"].map((r) => `<button class="filter-btn" data-val="${r}">${r}</button>`).join("");
+el("gift-tier-filters").innerHTML = [...new Set(MD_GIFTS.map((g) => g.tier))].filter(Boolean).sort((a, b) => a - b)
+  .map((t) => `<button class="filter-btn" data-val="${t}">T${t}</button>`).join("")
+  + (MD_GIFTS.some((g) => g.ex) ? `<button class="filter-btn" data-val="EX">EX</button>` : "");
+el("gift-diff-filters").innerHTML = `<span class="fr-label">출현</span>`
+  + ["노말", "하드", "익스"].map((d) => `<button class="filter-btn diff-btn d-${d}" data-val="${d}">${d}</button>`).join("");
 
-function giftCard(g) {
+/* 즐겨찾기 (localStorage) */
+const GIFT_FAV_KEY = "md_gift_favs";
+let giftFavs = new Set();
+try { giftFavs = new Set(JSON.parse(localStorage.getItem(GIFT_FAV_KEY) || "[]")); } catch (_) {}
+const isFav = (g) => giftFavs.has(normName(g.name));
+function toggleFav(key) {
+  if (giftFavs.has(key)) giftFavs.delete(key); else giftFavs.add(key);
+  try { localStorage.setItem(GIFT_FAV_KEY, JSON.stringify([...giftFavs])); } catch (_) {}
+}
+
+const tierBadge = (g) => g.ex ? `<span class="badge tier ex">EX</span>` : `<span class="badge tier">T${g.tier}</span>`;
+const diffBadges = (g) => (g.diff || []).map((d) => `<span class="badge diff d-${d}">${d} 출현</span>`).join("");
+
+/* 갤러리 아이콘 */
+function giftGridCard(g) {
+  const key = normName(g.name);
+  return `<div class="gift-grid-item${isFav(g) ? " is-fav" : ""}" data-gname="${esc(key)}" title="${esc(g.name)}">
+    <button class="gg-fav${isFav(g) ? " on" : ""}" data-fav="${esc(key)}" title="즐겨찾기" aria-label="즐겨찾기">★</button>
+    ${giftThumb(g)}<div class="gg-name">${esc(g.name)}</div>
+  </div>`;
+}
+
+/* 상세(모달): 큰 아이콘 + 효과 + 조합식 */
+function giftDetail(g) {
+  const key = normName(g.name);
   const kw = g.keywords.map((k) => `<span class="badge kw">${esc(k)}</span>`).join("");
   const cost = g.cost ? `· 가격 ${g.cost}` : "";
   const en = g.name_en && g.name_en !== g.name ? `<span class="en">${esc(g.name_en)}</span>` : "";
-  return `<div class="card" data-gname="${esc(normName(g.name))}">
-    <div class="card-head">
+  const extra = `${g.enhance ? `<span class="badge enh2">강화 가능</span>` : ""}`
+    + `${g.curse ? `<span class="badge curse">저주</span>` : ""}${g.bless ? `<span class="badge bless">축복</span>` : ""}`;
+  const limited = g.limited && g.limited.length
+    ? `<div class="gift-limited"><span class="ri-label">🎴 한정 카드팩</span> ${g.limited.map(esc).join(", ")}</div>` : "";
+  return `<div class="card-head">
       ${giftThumb(g)}
       <div class="card-head-body">
         <h3>${esc(g.name)} ${en}</h3>
         <div class="badges">
-          <span class="badge tier">T${g.tier}</span>
+          ${tierBadge(g)}
           ${g.sin ? `<span class="badge sin">${esc(g.sin)}</span>` : ""}
           ${kw}
           <span class="badge">${esc(g.role)}</span>
+          ${diffBadges(g)}
+          ${extra}
         </div>
       </div>
+      <button class="gd-fav${isFav(g) ? " on" : ""}" data-fav="${esc(key)}" title="즐겨찾기">★</button>
     </div>
-    <div class="effect">${formatEffect(g.effect)}</div>
+    <div class="effect">${formatEffect(g.effect, true)}</div>
     <div class="meta">${esc(g.role)} ${cost}</div>
-    ${giftRecipeInfo(g)}
-  </div>`;
+    ${limited}
+    ${giftRecipeInfo(g)}`;
+}
+
+function sortGifts(arr) {
+  const a = arr.slice();
+  switch (el("gift-sort").value) {
+    case "cost-desc": a.sort((x, y) => (y.cost || 0) - (x.cost || 0)); break;
+    case "cost-asc": a.sort((x, y) => (x.cost || 0) - (y.cost || 0)); break;
+    case "name": a.sort((x, y) => x.name.localeCompare(y.name, "ko")); break;
+    default: a.sort((x, y) => ((y.ex ? 6 : y.tier || 0) - (x.ex ? 6 : x.tier || 0)) || (y.cost || 0) - (x.cost || 0));
+  }
+  return a;
 }
 
 function renderGifts() {
   const q = el("gift-search").value.trim().toLowerCase();
-  const sin = el("gift-sin").value;
-  const kw = el("gift-keyword").value;
-  const role = el("gift-role").value;
-  const tier = el("gift-tier").value;
-
-  const list = GIFTS.filter((g) => {
+  const kws = activeFilterVals("gift-kw-filters");
+  const kwAnd = el("gift-kw-mode").dataset.mode === "and";
+  const sin = activeFilterVal("gift-sin-filters");
+  const role = activeFilterVal("gift-role-filters"), tier = activeFilterVal("gift-tier-filters");
+  const diff = activeFilterVal("gift-diff-filters");
+  const favOnly = el("gift-fav-only").classList.contains("on");
+  const list = sortGifts(MD_GIFTS.filter((g) => {
+    if (favOnly && !isFav(g)) return false;
     if (sin && g.sin !== sin) return false;
-    if (kw && !g.keywords.includes(kw)) return false;
+    if (kws.length) {
+      const ok = kwAnd ? kws.every((k) => g.keywords.includes(k)) : kws.some((k) => g.keywords.includes(k));
+      if (!ok) return false;
+    }
     if (role && g.role !== role) return false;
-    if (tier && String(g.tier) !== tier) return false;
+    if (tier === "EX") { if (!g.ex) return false; } else if (tier && String(g.tier) !== tier) return false;
+    if (diff && !(g.diff || []).includes(diff)) return false;
     if (q && !(`${g.name} ${g.name_en || ""} ${g.effect}`.toLowerCase().includes(q))) return false;
     return true;
-  });
-
-  el("gift-count").textContent = `${list.length}개 / 전체 ${GIFTS.length}개`;
-  el("gift-list").innerHTML = list.length
-    ? list.map(giftCard).join("")
-    : `<p class="empty">조건에 맞는 기프트가 없습니다.</p>`;
+  }));
+  el("gift-count").textContent = `${list.length}개 / 전체 ${MD_GIFTS.length}개`;
+  el("gift-list").innerHTML = list.length ? list.map(giftGridCard).join("") : `<p class="empty">조건에 맞는 기프트가 없습니다.</p>`;
 }
-
-["gift-search", "gift-sin", "gift-keyword", "gift-role", "gift-tier"].forEach((id) =>
-  el(id).addEventListener("input", renderGifts)
-);
+function openGiftModal(g) {
+  if (!g) return;
+  el("gift-modal").querySelector(".sm-body").innerHTML = giftDetail(g);
+  el("gift-modal").classList.add("open");
+}
+el("gift-search").addEventListener("input", renderGifts);
+el("gift-sort").addEventListener("change", renderGifts);
+// 키워드는 다중 선택, 나머지는 단일 선택
+["gift-kw-filters", "gift-sin-filters", "gift-role-filters", "gift-tier-filters", "gift-diff-filters"].forEach((id) => el(id).addEventListener("click", (e) => {
+  const b = e.target.closest(".filter-btn"); if (!b) return;
+  const was = b.classList.contains("on");
+  if (id !== "gift-kw-filters") el(id).querySelectorAll(".filter-btn").forEach((x) => x.classList.remove("on"));
+  b.classList.toggle("on", !was);
+  renderGifts();
+}));
+el("gift-kw-mode").addEventListener("click", () => {
+  const btn = el("gift-kw-mode");
+  const and = btn.dataset.mode === "and";
+  btn.dataset.mode = and ? "or" : "and";
+  btn.textContent = and ? "키워드 OR" : "키워드 AND";
+  btn.classList.toggle("on", !and);
+  renderGifts();
+});
+el("gift-fav-only").addEventListener("click", () => { el("gift-fav-only").classList.toggle("on"); renderGifts(); });
+el("gift-reset").addEventListener("click", () => {
+  el("gift-search").value = "";
+  el("gift-sort").value = "tier";
+  ["gift-kw-filters", "gift-sin-filters", "gift-role-filters", "gift-tier-filters", "gift-diff-filters"]
+    .forEach((id) => el(id).querySelectorAll(".filter-btn").forEach((x) => x.classList.remove("on")));
+  el("gift-fav-only").classList.remove("on");
+  const km = el("gift-kw-mode"); km.dataset.mode = "or"; km.textContent = "키워드 OR"; km.classList.remove("on");
+  renderGifts();
+});
+el("gift-list").addEventListener("click", (e) => {
+  const favBtn = e.target.closest(".gg-fav");
+  if (favBtn) { e.stopPropagation(); toggleFav(favBtn.dataset.fav); renderGifts(); return; }
+  const item = e.target.closest(".gift-grid-item");
+  if (item) openGiftModal(giftByName.get(item.dataset.gname));
+});
+// 모달 내 즐겨찾기 별
+el("gift-modal").addEventListener("click", (e) => {
+  const favBtn = e.target.closest(".gd-fav");
+  if (favBtn) { toggleFav(favBtn.dataset.fav); favBtn.classList.toggle("on"); renderGifts(); return; }
+});
+el("gift-modal-close").addEventListener("click", () => el("gift-modal").classList.remove("open"));
+el("gift-modal").addEventListener("click", (e) => { if (e.target.id === "gift-modal") el("gift-modal").classList.remove("open"); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") el("gift-modal").classList.remove("open"); });
 renderGifts();
 
 /* =============================================================
@@ -400,7 +532,6 @@ if (typeof SINNERS !== "undefined") {
   el("sin-filters").innerHTML = SINS.map((s) => `<button class="filter-btn" data-val="${esc(s)}"><img class="fb-ic" src="assets/sin/${encodeURIComponent(s)}.png" onerror="this.style.display='none'">${esc(s)}</button>`).join("");
   el("rar-filters").innerHTML = ["0", "00", "000"].map((r) => `<button class="filter-btn" data-val="${r}"><img class="fb-ic" src="assets/ui/rank_0${r.length}.png" onerror="this.style.display='none'">${r}</button>`).join("");
 }
-const activeFilterVal = (id) => { const b = el(id).querySelector(".filter-btn.on"); return b ? b.dataset.val : ""; };
 const sinIcon = (sin) => sin
   ? `<img class="kwt-ic" src="assets/sin/${encodeURIComponent(sin)}.png" alt="" onerror="this.style.display='none'">` : "";
 
@@ -642,7 +773,7 @@ if (typeof SINNERS !== "undefined") {
 
 function packsForKeywords(keywords) {
   if (typeof CARDPACKS === "undefined") return [];
-  const giftNames = GIFTS.filter((g) => g.keywords.some((k) => keywords.includes(k))).map((g) => g.name);
+  const giftNames = MD_GIFTS.filter((g) => g.keywords.some((k) => keywords.includes(k))).map((g) => g.name);
   const out = [];
   for (const p of CARDPACKS) {
     if (!p.events.length) continue;
@@ -661,7 +792,7 @@ el("party-run").addEventListener("click", () => {
     return;
   }
 
-  const scored = GIFTS.map((g) => {
+  const scored = MD_GIFTS.map((g) => {
     const match = g.keywords.filter((k) => picked.includes(k));
     let score = match.length * 10;
     if (g.role === "발동" && match.length) score += 5;
@@ -711,7 +842,7 @@ el("damage-run").addEventListener("click", () => {
 
   const blocks = picked.map((kw) => {
     const rule = SYNERGY_RULES[kw];
-    const owned = GIFTS.filter((g) => g.keywords.includes(kw));
+    const owned = MD_GIFTS.filter((g) => g.keywords.includes(kw));
     const haveRoles = new Set(owned.map((g) => g.role));
     const missing = rule ? rule.needs.filter((r) => !haveRoles.has(r)) : [];
 
@@ -770,24 +901,9 @@ el("damage-run").addEventListener("click", () => {
 function gotoGift(name) {
   const g = giftByName.get(normName(name));
   if (!g) return;
-  // 기프트 검색 탭으로 전환
-  const tabBtn = document.querySelector('.tab[data-tab="gifts"]');
-  if (tabBtn) tabBtn.click();
-  // 필터 초기화 후 "실제 기프트명"으로 검색 (레시피명과 띄어쓰기가 다를 수 있음)
-  ["gift-sin", "gift-keyword", "gift-role", "gift-tier"].forEach((id) => { if (el(id)) el(id).value = ""; });
-  const s = el("gift-search");
-  s.value = g.name;
-  s.dispatchEvent(new Event("input"));
-  // 렌더 후 해당 카드로 스크롤 + 강조
-  setTimeout(() => {
-    const target = el("gift-list").querySelector(`[data-gname="${normName(g.name)}"]`)
-      || el("gift-list").querySelector(".card");
-    if (!target) return;
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
-    target.classList.remove("flash");
-    void target.offsetWidth;   // 리플로우로 애니메이션 재시작
-    target.classList.add("flash");
-  }, 30);
+  // 다른 모달은 닫고 해당 기프트 상세 모달 열기
+  document.querySelectorAll(".modal-overlay.open").forEach((m) => m.classList.remove("open"));
+  openGiftModal(g);
 }
 document.addEventListener("click", (e) => {
   const t = e.target.closest && e.target.closest(".goto-gift[data-goto]");
@@ -846,4 +962,110 @@ document.addEventListener("click", (e) => {
     cur.style.transform = `translate(${x + 14}px, ${y + 8}px)`;
     requestAnimationFrame(loop);
   })();
+})();
+
+/* =============================================================
+ *  배경 코스믹 별하늘 캔버스 (거울던전 분위기)
+ *  · 트윙클 별  · 발광 별  · 은은한 금빛 먼지  · 이따금 별똥별
+ * ============================================================= */
+(function () {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const canvas = document.getElementById("lc-embers");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let W = 0, H = 0, stars = [], dust = [], shoots = [], last = 0, nextShoot = 2.5;
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  function spawnDust(initial) {
+    return {
+      x: Math.random() * W,
+      y: initial ? Math.random() * H : H + 8,
+      r: rand(0.7, 1.8), vy: rand(6, 16),
+      sway: rand(6, 18), swayv: rand(0.3, 0.9), ph: Math.random() * Math.PI * 2,
+      life: rand(0, 4), max: rand(8, 16), hue: rand(36, 48),
+    };
+  }
+  function spawnShoot() {
+    const fromLeft = Math.random() < 0.5;
+    const x = fromLeft ? rand(0, W * 0.4) : rand(W * 0.6, W);
+    const y = rand(0, H * 0.35);
+    const ang = (fromLeft ? rand(0.15, 0.45) : rand(Math.PI - 0.45, Math.PI - 0.15));
+    const sp = rand(420, 680);
+    return { x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, len: rand(80, 160), life: 0, max: rand(0.5, 0.9) };
+  }
+  function build() {
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + "px"; canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    stars = Array.from({ length: Math.round(W * H / 7000) }, () => {
+      const bright = Math.random() < 0.08;
+      return {
+        x: Math.random() * W, y: Math.random() * H,
+        r: bright ? rand(1.1, 1.9) : rand(0.35, 1.1),
+        base: rand(0.12, 0.5), tw: rand(0.5, 1.9), ph: Math.random() * Math.PI * 2,
+        glow: bright, gold: Math.random() < 0.3,
+      };
+    });
+    dust = Array.from({ length: Math.round(W / 70) }, () => spawnDust(true));
+  }
+  function frame(t) {
+    const dt = last ? Math.min((t - last) / 1000, 0.05) : 0.016;
+    last = t;
+    ctx.clearRect(0, 0, W, H);
+
+    // 별 (트윙클 + 발광 헤일로)
+    for (const s of stars) {
+      s.ph += dt * s.tw;
+      const a = Math.max(0, s.base + Math.sin(s.ph) * s.base * 0.75);
+      const col = s.gold ? "220,190,130" : "215,224,242";
+      if (s.glow) {
+        const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 4);
+        g.addColorStop(0, `rgba(${col},${a * 0.5})`);
+        g.addColorStop(1, `rgba(${col},0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 4, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${col},${a})`;
+      ctx.fill();
+    }
+
+    // 금빛 먼지 (천천히 떠오름)
+    for (const e of dust) {
+      e.life += dt; e.y -= e.vy * dt; e.ph += e.swayv * dt;
+      const x = e.x + Math.sin(e.ph) * e.sway;
+      const a = Math.sin(Math.min(e.life / e.max, 1) * Math.PI) * 0.5;
+      const g = ctx.createRadialGradient(x, e.y, 0, x, e.y, e.r * 3);
+      g.addColorStop(0, `hsla(${e.hue},85%,66%,${a})`);
+      g.addColorStop(1, `hsla(${e.hue},85%,60%,0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, e.y, e.r * 3, 0, Math.PI * 2); ctx.fill();
+      if (e.y < -10 || e.life > e.max) Object.assign(e, spawnDust(false));
+    }
+
+    // 별똥별 (이따금)
+    nextShoot -= dt;
+    if (nextShoot <= 0 && shoots.length < 2) { shoots.push(spawnShoot()); nextShoot = rand(4, 9); }
+    for (let i = shoots.length - 1; i >= 0; i--) {
+      const sh = shoots[i];
+      sh.life += dt; sh.x += sh.vx * dt; sh.y += sh.vy * dt;
+      const k = 1 - sh.life / sh.max;
+      const a = Math.max(0, Math.sin((sh.life / sh.max) * Math.PI)) * 0.9;
+      const tx = sh.x - sh.vx / Math.hypot(sh.vx, sh.vy) * sh.len;
+      const ty = sh.y - sh.vy / Math.hypot(sh.vx, sh.vy) * sh.len;
+      const g = ctx.createLinearGradient(sh.x, sh.y, tx, ty);
+      g.addColorStop(0, `rgba(255,240,200,${a})`);
+      g.addColorStop(1, "rgba(255,240,200,0)");
+      ctx.strokeStyle = g; ctx.lineWidth = 1.6; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(tx, ty); ctx.stroke();
+      if (sh.life > sh.max || k <= 0 || sh.x < -200 || sh.x > W + 200 || sh.y > H + 200) shoots.splice(i, 1);
+    }
+    requestAnimationFrame(frame);
+  }
+  build();
+  let rz;
+  window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(build, 200); });
+  requestAnimationFrame(frame);
 })();
