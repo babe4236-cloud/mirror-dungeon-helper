@@ -911,11 +911,12 @@ function runPartyRec() {
   } else if (!pf.size) {
     tailoredHtml = `<p class="meta">현재 파티 인격에 연결된 집단 전용 기프트가 없습니다. 위 범용 기프트를 챙기세요.</p>`;
   } else {
-    const matched = MD_GIFTS.filter((g) => picked.some((k) => g.keywords.includes(k)) && giftFactions(g).some((f) => pf.has(f))).sort(byTierCost).slice(0, 24);
+    // 인격(집단) 기준으로만 매칭 — 선택 키워드와 무관하게 파티 집단 전용 기프트를 모두 표시
+    const matched = MD_GIFTS.filter((g) => giftFactions(g).some((f) => pf.has(f))).sort(byTierCost).slice(0, 40);
     tailoredHtml = matched.length
-      ? `<p class="hint">파티 집단: ${[...pf].map((f) => `<span class="badge kw">${esc(f)}</span>`).join(" ")}</p>
+      ? `<p class="hint">파티 집단: ${[...pf].map((f) => `<span class="badge kw">${esc(f)}</span>`).join(" ")} <small class="meta">(키워드와 무관하게 집단 기준으로 표시)</small></p>
          <div class="core-chips">${matched.map((g) => factionChip(g, giftFactions(g).filter((f) => pf.has(f)))).join("")}</div>`
-      : `<p class="meta">파티 집단(${[...pf].join("·")})에 맞는 키워드 전용 기프트는 없습니다.</p>`;
+      : `<p class="meta">파티 집단(${[...pf].join("·")})에 맞는 전용 기프트는 없습니다.</p>`;
   }
 
   const packs = packsForKeywords(picked);
