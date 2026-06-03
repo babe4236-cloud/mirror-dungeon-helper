@@ -919,6 +919,17 @@ function runPartyRec() {
       : `<p class="meta">파티 집단(${[...pf].join("·")})에 맞는 전용 기프트는 없습니다.</p>`;
   }
 
+  // 범용 버프·디버프 (키워드 무관) — 어떤 파티든 챙기면 좋은 것
+  const utilCol = (title, terms) => {
+    const gs = MD_GIFTS.map((g) => ({ g, label: terms.find((t) => (g.effect || "").includes(t)) }))
+      .filter((x) => x.label).sort((a, b) => giftTierVal(b.g) - giftTierVal(a.g)).slice(0, 14);
+    return `<div class="gift-kw-col"><div class="core-h">${title} <small class="meta">(${gs.length})</small></div>
+      <div class="core-chips">${gs.map(({ g, label }) => factionChip(g, [label])).join("") || '<small class="meta">없음</small>'}</div></div>`;
+  };
+  const utilBlock = `<div class="result-block"><h3>🛡️ 범용 버프·디버프 <span class="meta">(키워드 무관)</span></h3>
+    <p class="hint">상태이상 빌드와 별개로, 어떤 파티든 챙기면 좋은 <b>적 디버프</b>·<b>아군 버프</b> 기프트입니다. 칩을 누르면 상세로 이동.</p>
+    <div class="gift-kw-cols">${utilCol("⚔️ 적 디버프", typeof DEBUFF_TERMS !== "undefined" ? DEBUFF_TERMS : [])}${utilCol("✨ 아군 버프", typeof BUFF_TERMS !== "undefined" ? BUFF_TERMS : [])}</div></div>`;
+
   const packs = packsForKeywords(picked);
   const packRows = packs.length ? packs.map(({ p, hits }) =>
     `<div class="rank-item"><b>${esc(p.title)}</b> <span class="badge kw">${esc(p.theme)}</span>
@@ -938,6 +949,7 @@ function runPartyRec() {
     <div class="result-block"><h3>🎯 파티 맞춤 전용 기프트</h3>
       <p class="hint">지금 파티 인격의 <b>집단</b>에 맞춰 효과가 강해지는 전용 기프트입니다.</p>
       ${tailoredHtml}</div>
+    ${utilBlock}
     ${roleBalanceBlock(picked)}
     <div class="result-block"><h3>③ 추천 카드팩 (루트)</h3>
       <p class="hint">파티 키워드 기프트를 주는 사건이 있는 팩입니다. 이 팩을 골라 루트를 짜세요.</p>${packRows}</div>
