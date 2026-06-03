@@ -798,31 +798,42 @@ function recommendSinners(keywords, exclude) {
   if (typeof SINNERS === "undefined") return [];
   const ex = new Set(exclude.map((s) => s.id));
   const rw = { "000": 3, "00": 2, "0": 1 };
+  // 파티의 우세 죄악(공명 시너지용): 해당 죄악 스킬 보유 인격이 가장 많은 죄악
+  const sinCnt = {};
+  exclude.forEach((s) => [...new Set(sinnerSkillSins(s))].forEach((sin) => { sinCnt[sin] = (sinCnt[sin] || 0) + 1; }));
+  const domSin = Object.entries(sinCnt).sort((a, b) => b[1] - a[1])[0]?.[0];
   return SINNERS.map((s) => {
     const match = idKeywords(s).filter((k) => keywords.includes(k));
-    return { s, match, score: match.length * 10 + (rw[s.rarity] || 0) };
+    let score = match.length * 10 + (rw[s.rarity] || 0);
+    if (domSin && sinnerSkillSins(s).includes(domSin)) score += 3; // 공명 시너지
+    return { s, match, score };
   }).filter((x) => x.match.length && !ex.has(x.s.id))
     .sort((a, b) => b.score - a.score || b.match.length - a.match.length)
     .slice(0, 12);
 }
 
-/* 죄악 공명 분석 — 파티 스킬의 죄악 분포 */
+/* 죄악 공명 잠재력 — 한 턴에 같은 죄악 스킬 2개=공명, 3개=완전 공명.
+ * 한 인격은 턴당 스킬 1개 사용 → '해당 죄악 스킬을 가진 인격 수'가 곧 공명 잠재력. */
 function resonanceBlock() {
   if (!party.length) return "";
   const cnt = {};
-  party.forEach((s) => sinnerSkillSins(s).forEach((sin) => { cnt[sin] = (cnt[sin] || 0) + 1; }));
+  party.forEach((s) => [...new Set(sinnerSkillSins(s))].forEach((sin) => { cnt[sin] = (cnt[sin] || 0) + 1; }));
   const sorted = Object.entries(cnt).sort((a, b) => b[1] - a[1]);
   if (!sorted.length) return "";
   const max = sorted[0][1];
+  const tag = (c) => c >= 3 ? " · 완전 공명 가능" : c >= 2 ? " · 공명 가능" : "";
   const bars = sorted.map(([sin, c]) => `<div class="res-row">
       <span class="badge sin" style="min-width:58px">${sinIcon(sin)}${esc(sin)}</span>
       <div class="res-bar"><div class="res-fill" style="width:${Math.round(c / max * 100)}%;background:${SIN_COLOR[sin] || "#9c6639"}"></div></div>
-      <small class="meta">${c}스킬${c >= 3 ? " · 공명✦" : ""}</small></div>`).join("");
+      <small class="meta">${c}명${tag(c)}</small></div>`).join("");
   const top = sorted[0];
   const tip = top[1] >= 3
-    ? `<b>${esc(top[0])}</b> 공명이 안정적으로 터집니다(스킬 ${top[1]}개). 같은 죄악 스킬 3개↑면 공명 위력이 강해집니다.`
-    : `죄악이 분산돼 있습니다. 한 죄악 스킬을 3개 이상으로 모으면 공명이 잘 터집니다.`;
-  return `<div class="result-block"><h3>🌀 죄악 공명 분석</h3><p class="hint">${tip}</p>${bars}</div>`;
+    ? `<b>${esc(top[0])}</b> 스킬을 가진 인격이 ${top[1]}명 → 매 턴 같은 죄악 스킬 3개를 골라 <b>완전 공명</b>을 노릴 수 있습니다.`
+    : top[1] >= 2
+      ? `<b>${esc(top[0])}</b>로 공명(2개)은 가능하지만 완전 공명(3개)엔 인격이 더 필요합니다.`
+      : `죄악이 흩어져 있어 공명이 어렵습니다. 한 죄악 인격을 2~3명 이상 모으세요.`;
+  return `<div class="result-block"><h3>🌀 죄악 공명 잠재력</h3>
+    <p class="hint">한 턴에 같은 죄악 스킬 <b>2개=공명</b>, <b>3개=완전 공명</b> → 스킬 위력↑·EGO 자원 생성. 아래는 죄악별 스킬 보유 인격 수입니다. ${tip}</p>${bars}</div>`;
 }
 
 /* 역할 균형 — 선택 키워드에 대응하는 기프트의 역할 분포 */
@@ -838,7 +849,7 @@ function roleBalanceBlock(picked) {
   const warn = (cnt["부여"] === 0 || cnt["발동"] === 0)
     ? `<p class="hint warn">⚠ 상태이상 딜은 <b>부여</b>(쌓기)와 <b>발동</b>(터뜨리기)이 모두 필요합니다.</p>` : "";
   return `<div class="result-block"><h3>⚖️ 역할 균형 <span class="meta">(사용 가능 기프트)</span></h3>
-    <p class="hint">부여로 쌓고 발동으로 터뜨리는 균형이 중요합니다.</p>${warn}${bars}</div>`;
+    <p class="hint">부여로 쌓고 발동으로 터뜨리는 균형이 중요합니다. <small class="meta">(역할은 효과 텍스트 기반 자동 분류라 일부 오차가 있을 수 있습니다.)</small></p>${warn}${bars}</div>`;
 }
 
 el("party-run").addEventListener("click", runPartyRec);
@@ -873,9 +884,9 @@ function runPartyRec() {
   const scored = MD_GIFTS.map((g) => {
     const match = g.keywords.filter((k) => picked.includes(k));
     let score = match.length * 10;
-    if (g.role === "발동" && match.length) score += 5;
-    if (g.role === "증폭" && match.length) score += 3;
-    if (g.tier >= 3) score += 2;
+    // 매칭된 상태이상이 '실제로 필요로 하는 역할'일 때만 가점 (메커니즘 기반)
+    if (match.some((k) => SYNERGY_RULES[k] && SYNERGY_RULES[k].needs.includes(g.role))) score += 4;
+    if (g.ex) score += 4; else if ((g.tier || 0) >= 3) score += 2;
     return { g, score, match };
   }).filter((s) => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 12);
 
