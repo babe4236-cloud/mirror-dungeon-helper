@@ -665,6 +665,11 @@ body {
 .dmg-tips { margin: 4px 0 0; padding-left: 18px; font-size: 0.88rem; line-height: 1.6; }
 .dmg-tips li { margin: 4px 0; }
 
+/* 추천 기프트 — 키워드별 칸 */
+.gift-kw-cols { display: flex; flex-wrap: wrap; gap: 14px; }
+.gift-kw-col { flex: 1; min-width: 200px; }
+.gift-kw-col .core-h { display: flex; align-items: center; gap: 4px; }
+
 .footer {
   text-align: center;
   color: var(--muted);

@@ -808,15 +808,9 @@ function recommendSinners(keywords, exclude) {
     if (domSin && sinnerSkillSins(s).includes(domSin)) score += 3; // 공명 시너지
     return { s, match, score };
   }).filter((x) => x.match.length && !exSin.has(x.s.sinner))
-    .sort((a, b) => b.score - a.score || b.match.length - a.match.length);
-  // 수감자별 최고 인격 1명만 (한 수감자는 파티에 1명이므로 중복 추천 방지)
-  const seen = new Set(), out = [];
-  for (const x of scored) {
-    if (seen.has(x.s.sinner)) continue;
-    seen.add(x.s.sinner); out.push(x);
-    if (out.length >= 12) break;
-  }
-  return out;
+    .sort((a, b) => b.score - a.score || b.match.length - a.match.length)
+    .slice(0, 30); // 매칭 인격을 폭넓게 표시(같은 수감자의 다른 인격도). 추가 시점에 수감자 1명 제한.
+  return scored;
 }
 
 /* 죄악 공명 잠재력 — 한 턴에 같은 죄악 스킬 2개=공명, 3개=완전 공명.
@@ -886,24 +880,15 @@ function runPartyRec() {
     ${party.length >= PARTY_MAX ? `<p class="meta">파티가 가득 찼습니다 (${PARTY_MAX}/${PARTY_MAX}). 슬롯의 인격을 눌러 제거할 수 있습니다.</p>`
       : (precRows || `<p class="meta">파티 키워드가 겹치는 인격이 없습니다.</p>`)}</div>`;
 
-  const scored = MD_GIFTS.map((g) => {
-    const match = g.keywords.filter((k) => picked.includes(k));
-    let score = match.length * 10;
-    // 매칭된 상태이상이 '실제로 필요로 하는 역할'일 때만 가점 (메커니즘 기반)
-    if (match.some((k) => SYNERGY_RULES[k] && SYNERGY_RULES[k].needs.includes(g.role))) score += 4;
-    if (g.ex) score += 4; else if ((g.tier || 0) >= 3) score += 2;
-    return { g, score, match };
-  }).filter((s) => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 40);
-
-  const giftRows = scored.map((s) => `
-    <div class="rank-item rank-flex goto-gift" data-goto="${escAttr(s.g.name)}">
-      ${giftThumb(s.g, "sm")}
-      <div>
-        <span class="score">${s.score}점</span> · <b>${esc(s.g.name)}</b>
-        <span class="badge">${esc(s.g.role)}</span>
-        <small class="meta"> ${s.match.join(", ")}${s.g.cost ? " · 가격 " + s.g.cost : ""}</small>
-      </div>
-    </div>`).join("");
+  // ② 추천 기프트 — 키워드별 칸으로 분리(각 키워드 매칭 기프트를 티어순)
+  const giftCols = picked.map((kw) => {
+    const gs = MD_GIFTS.filter((g) => g.keywords.includes(kw))
+      .sort((a, b) => giftTierVal(b) - giftTierVal(a) || (b.cost || 0) - (a.cost || 0)).slice(0, 14);
+    return `<div class="gift-kw-col">
+      <div class="core-h"><img class="kwt-ic" src="assets/keywords/${encodeURIComponent(kw)}.webp" onerror="this.style.display='none'"> ${esc(kw)} <small class="meta">(${gs.length})</small></div>
+      <div class="core-chips">${gs.map(coreGiftChip).join("") || '<small class="meta">없음</small>'}</div>
+    </div>`;
+  }).join("");
 
   const packs = packsForKeywords(picked);
   const packRows = packs.length ? packs.map(({ p, hits }) =>
@@ -918,8 +903,9 @@ function runPartyRec() {
   out.innerHTML = `
     ${precBlock}
     ${resonanceBlock()}
-    <div class="result-block"><h3>② 추천 기프트 <span class="meta">(${picked.join(", ")})</span></h3>
-      <p class="hint">우선순위: <b>${scored.slice(0, 3).map((s) => s.g.name).join(" → ")}</b> · 카드를 누르면 해당 기프트로 이동</p>${giftRows}</div>
+    <div class="result-block"><h3>② 추천 기프트 <span class="meta">(키워드별)</span></h3>
+      <p class="hint">키워드별 상위 티어 기프트입니다. 칩을 누르면 상세로 이동.</p>
+      <div class="gift-kw-cols">${giftCols}</div></div>
     ${roleBalanceBlock(picked)}
     <div class="result-block"><h3>③ 추천 카드팩 (루트)</h3>
       <p class="hint">파티 키워드 기프트를 주는 사건이 있는 팩입니다. 이 팩을 골라 루트를 짜세요.</p>${packRows}</div>
@@ -950,7 +936,11 @@ if (typeof SINNERS !== "undefined") {
   el("party-auto").addEventListener("click", () => {
     const picked = currentKeywords();
     if (!picked.length) { partyMsg("키워드를 1개 이상 고른 뒤 자동 구성하세요."); return; }
-    for (const { s } of recommendSinners(picked, party)) { if (party.length >= PARTY_MAX) break; party.push(s); }
+    for (const { s } of recommendSinners(picked, party)) {
+      if (party.length >= PARTY_MAX) break;
+      if (party.some((p) => p.sinner === s.sinner)) continue; // 같은 수감자 1명만
+      party.push(s);
+    }
     partyChanged(); runPartyRec(); partyMsg(`상위 추천으로 파티를 채웠습니다 (${party.length}/${PARTY_MAX}).`);
   });
   el("party-save").addEventListener("click", () => {
