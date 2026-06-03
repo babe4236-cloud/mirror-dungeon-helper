@@ -617,19 +617,25 @@ body {
 .rank-item { padding: 8px 0; border-top: 1px solid var(--border); }
 .rank-item:first-child { border-top: none; }
 
-/* 추천 인격 카드 */
-.prec-item { cursor: pointer; border-radius: 8px; padding: 8px 6px; transition: background .12s; }
-.prec-item:hover { background: rgba(200,162,74,0.10); }
-.prec-item:hover .prec-add { opacity: 1; }
-.prec-art {
-  width: 46px; height: 46px; object-fit: cover; border-radius: 7px;
-  border: 1px solid var(--border); flex: 0 0 auto;
-}
 .rar { color: #e7c873; font-size: 0.78rem; letter-spacing: -1px; margin-left: 2px; }
-.prec-add {
-  float: right; font-size: 0.74rem; color: #f4d98c; opacity: 0; transition: opacity .12s;
-  border: 1px solid #6b4a26; border-radius: 999px; padding: 1px 8px; background: rgba(200,162,74,0.12);
+
+/* 추천 인격 — 컴팩트 그리드 카드 (매칭 인격 전부 표시) */
+.prec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap: 8px; }
+.prec-card {
+  cursor: pointer; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  background: rgba(0,0,0,0.22); transition: transform .12s, border-color .12s;
 }
+.prec-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+.prec-cimg { position: relative; }
+.prec-cart { width: 100%; aspect-ratio: 119/170; object-fit: cover; display: block; }
+.prec-ckw { position: absolute; top: 3px; right: 3px; display: flex; flex-direction: column; gap: 2px; }
+.prec-ckw .kwt-ic { width: 17px; height: 17px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
+.prec-csin { position: absolute; bottom: 3px; left: 3px; }
+.prec-csin .kwt-ic { width: 17px; height: 17px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
+.prec-cbody { padding: 4px 6px 6px; }
+.prec-cname { font-family: "kotra_bold","Malgun Gothic",sans-serif; font-size: 0.74rem; line-height: 1.15; word-break: keep-all; }
+.prec-csub { font-size: 0.62rem; color: var(--muted); line-height: 1.2; margin-top: 1px; display: flex; align-items: center; gap: 3px; }
+.prec-csub small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 파티 액션 버튼줄 + 메시지 */
 .party-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0; }

@@ -808,8 +808,8 @@ function recommendSinners(keywords, exclude) {
     if (domSin && sinnerSkillSins(s).includes(domSin)) score += 3; // 공명 시너지
     return { s, match, score };
   }).filter((x) => x.match.length && !exSin.has(x.s.sinner))
-    .sort((a, b) => b.score - a.score || b.match.length - a.match.length)
-    .slice(0, 30); // 매칭 인격을 폭넓게 표시(같은 수감자의 다른 인격도). 추가 시점에 수감자 1명 제한.
+    .sort((a, b) => b.score - a.score || b.match.length - a.match.length);
+  // 상한 없음 — 매칭 인격을 전부 표시(컴팩트 그리드). 추가 시점에만 수감자 1명 제한.
   return scored;
 }
 
@@ -874,23 +874,24 @@ function runPartyRec() {
     return;
   }
 
-  // ⓪ 추천 인격
+  // ⓪ 추천 인격 (컴팩트 그리드 — 매칭 인격 전부 표시)
   const recs = recommendSinners(picked, party);
-  const precRows = recs.map(({ s, match }) => `
-    <div class="rank-item rank-flex prec-item" data-id="${s.id}" title="클릭하면 파티에 추가">
-      <img class="prec-art" src="${esc(s.art || s.img || "")}" loading="lazy" onerror="this.style.visibility='hidden'">
-      <div>
-        <b>${esc(s.name)}</b> <small class="meta">${esc(s.title)}</small>
-        <span class="badge sin">${sinIcon(s.sin)}${esc(s.sin)}</span>
-        <small class="rar">${RARITY_STARS[s.rarity] || ""}</small>
-        <span class="prec-add">＋ 파티에</span><br>
-        ${match.map((k) => `<span class="badge kw"><img class="kwt-ic" src="assets/keywords/${encodeURIComponent(k)}.webp" onerror="this.style.display='none'">${esc(k)}</span>`).join("")}
+  const precCards = recs.map(({ s, match }) => `
+    <div class="prec-card prec-item" data-id="${s.id}" title="${esc(s.name)} · ${esc(s.title)} — 클릭하면 파티에 추가">
+      <div class="prec-cimg">
+        <img class="prec-cart" src="${esc(s.art || s.img || "")}" loading="lazy" onerror="this.style.visibility='hidden'">
+        <span class="prec-ckw">${match.map((k) => `<img class="kwt-ic" src="assets/keywords/${encodeURIComponent(k)}.webp" title="${esc(k)}" onerror="this.style.display='none'">`).join("")}</span>
+        <span class="prec-csin">${sinIcon(s.sin)}</span>
+      </div>
+      <div class="prec-cbody">
+        <div class="prec-cname">${esc(s.name)}</div>
+        <div class="prec-csub"><span class="rar">${RARITY_STARS[s.rarity] || ""}</span> <small>${esc(s.title)}</small></div>
       </div>
     </div>`).join("");
-  const precBlock = `<div class="result-block"><h3>① 추천 인격 <span class="meta">(${picked.join(", ")})</span></h3>
-    <p class="hint">파티 키워드를 보유한 인격입니다. <b>클릭하면 파티 슬롯에 추가</b>됩니다 (현재 ${party.length}/${PARTY_MAX}).</p>
+  const precBlock = `<div class="result-block"><h3>① 추천 인격 <span class="meta">(${picked.join(", ")} · ${recs.length}명)</span></h3>
+    <p class="hint">파티 키워드를 보유한 인격을 <b>전부</b> 표시합니다(우측 위 = 보유 키워드). <b>클릭하면 파티 슬롯에 추가</b> (현재 ${party.length}/${PARTY_MAX}).</p>
     ${party.length >= PARTY_MAX ? `<p class="meta">파티가 가득 찼습니다 (${PARTY_MAX}/${PARTY_MAX}). 슬롯의 인격을 눌러 제거할 수 있습니다.</p>`
-      : (precRows || `<p class="meta">파티 키워드가 겹치는 인격이 없습니다.</p>`)}</div>`;
+      : (precCards ? `<div class="prec-grid">${precCards}</div>` : `<p class="meta">파티 키워드가 겹치는 인격이 없습니다.</p>`)}</div>`;
 
   // ② 추천 기프트 — 범용(전용 아님) 키워드별 칸 + 파티 맞춤(집단 전용)
   const byTierCost = (a, b) => giftTierVal(b) - giftTierVal(a) || (b.cost || 0) - (a.cost || 0);
