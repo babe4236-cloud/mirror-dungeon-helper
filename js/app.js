@@ -919,6 +919,24 @@ function runPartyRec() {
       : `<p class="meta">파티 집단(${[...pf].join("·")})에 맞는 전용 기프트는 없습니다.</p>`;
   }
 
+  // 파티 활용 기프트 — 선택 빌드 외에 파티 인격이 실제로 쓰는 공격타입·키워드
+  const partyAtk = ATK_TYPES.filter((t) => party.some((s) => sinnerAtkTypes(s).includes(t)));
+  const partyKwExtra = [...new Set(party.flatMap((s) => s.keywords))].filter((k) => !picked.includes(k));
+  const kwFreq = (kw) => party.filter((s) => idKeywords(s).includes(kw)).length;
+  const toolKws = [...new Set([...partyAtk, ...partyKwExtra])].sort((a, b) => kwFreq(b) - kwFreq(a)).slice(0, 6);
+  let toolBlock = "";
+  if (party.length && toolKws.length) {
+    const cols = toolKws.map((kw) => {
+      const gs = MD_GIFTS.filter((g) => g.keywords.includes(kw) && !isExclusiveGift(g)).sort(byTierCost).slice(0, 10);
+      if (!gs.length) return "";
+      return `<div class="gift-kw-col"><div class="core-h"><img class="kwt-ic" src="assets/keywords/${encodeURIComponent(kw)}.webp" onerror="this.style.display='none'"> ${esc(kw)} <small class="meta">(${kwFreq(kw)}명)</small></div>
+        <div class="core-chips">${gs.map(coreGiftChip).join("")}</div></div>`;
+    }).join("");
+    toolBlock = `<div class="result-block"><h3>🗡️ 파티 활용 기프트 <span class="meta">(공격타입·보유 키워드)</span></h3>
+      <p class="hint">선택 빌드(${esc(picked.join(", "))}) 외에, <b>파티 인격이 실제로 쓰는 공격타입·키워드</b>에 맞는 기프트입니다. 거던에서 같이 챙기면 도움됩니다. (괄호=보유 인격 수)</p>
+      <div class="gift-kw-cols">${cols}</div></div>`;
+  }
+
   // 범용 버프·디버프 (키워드 무관) — 어떤 파티든 챙기면 좋은 것
   const utilCol = (title, terms) => {
     const gs = MD_GIFTS.map((g) => ({ g, label: terms.find((t) => (g.effect || "").includes(t)) }))
@@ -946,6 +964,7 @@ function runPartyRec() {
     <div class="result-block"><h3>② 추천 기프트 — 범용 <span class="meta">(누구나 챙기면 좋음)</span></h3>
       <p class="hint">키워드별 상위 티어 <b>범용</b> 기프트입니다(특정 인격·집단 전용은 제외). 칩을 누르면 상세로 이동.</p>
       <div class="gift-kw-cols">${giftCols}</div></div>
+    ${toolBlock}
     <div class="result-block"><h3>🎯 파티 맞춤 전용 기프트</h3>
       <p class="hint">지금 파티 인격의 <b>집단</b>에 맞춰 효과가 강해지는 전용 기프트입니다.</p>
       ${tailoredHtml}</div>
