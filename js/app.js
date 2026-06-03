@@ -755,8 +755,8 @@ if (typeof SINNERS !== "undefined") {
     const q = el("party-isearch").value.trim().toLowerCase();
     const box = el("party-iresults");
     if (!q) { box.innerHTML = ""; return; }
-    const ids = new Set(party.map((s) => s.id));
-    const m = SINNERS.filter((s) => !ids.has(s.id) && `${s.name} ${s.title}`.toLowerCase().includes(q)).slice(0, 10);
+    const inSinners = new Set(party.map((s) => s.sinner)); // 같은 수감자는 1명만
+    const m = SINNERS.filter((s) => !inSinners.has(s.sinner) && `${s.name} ${s.title}`.toLowerCase().includes(q)).slice(0, 10);
     box.innerHTML = m.length ? m.map((s) =>
       `<div class="iresult" data-id="${s.id}">
         <img class="ires-art" src="${esc(s.art || s.img || "")}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
@@ -768,7 +768,7 @@ if (typeof SINNERS !== "undefined") {
     const row = e.target.closest(".iresult");
     if (!row) return;
     const s = sinnerById.get(+row.dataset.id);
-    if (s && party.length < 6 && !party.some((p) => p.id === s.id)) { party.push(s); partyChanged(); }
+    if (s && party.length < 6 && !party.some((p) => p.sinner === s.sinner)) { party.push(s); partyChanged(); }
     el("party-isearch").value = ""; el("party-iresults").innerHTML = "";
   });
   el("party-slots").addEventListener("click", (e) => {
@@ -796,20 +796,27 @@ function packsForKeywords(keywords) {
 const RARITY_STARS = { "000": "★★★", "00": "★★", "0": "★" };
 function recommendSinners(keywords, exclude) {
   if (typeof SINNERS === "undefined") return [];
-  const ex = new Set(exclude.map((s) => s.id));
+  const exSin = new Set(exclude.map((s) => s.sinner)); // 같은 수감자는 파티에 1명만
   const rw = { "000": 3, "00": 2, "0": 1 };
   // 파티의 우세 죄악(공명 시너지용): 해당 죄악 스킬 보유 인격이 가장 많은 죄악
   const sinCnt = {};
   exclude.forEach((s) => [...new Set(sinnerSkillSins(s))].forEach((sin) => { sinCnt[sin] = (sinCnt[sin] || 0) + 1; }));
   const domSin = Object.entries(sinCnt).sort((a, b) => b[1] - a[1])[0]?.[0];
-  return SINNERS.map((s) => {
+  const scored = SINNERS.map((s) => {
     const match = idKeywords(s).filter((k) => keywords.includes(k));
     let score = match.length * 10 + (rw[s.rarity] || 0);
     if (domSin && sinnerSkillSins(s).includes(domSin)) score += 3; // 공명 시너지
     return { s, match, score };
-  }).filter((x) => x.match.length && !ex.has(x.s.id))
-    .sort((a, b) => b.score - a.score || b.match.length - a.match.length)
-    .slice(0, 12);
+  }).filter((x) => x.match.length && !exSin.has(x.s.sinner))
+    .sort((a, b) => b.score - a.score || b.match.length - a.match.length);
+  // 수감자별 최고 인격 1명만 (한 수감자는 파티에 1명이므로 중복 추천 방지)
+  const seen = new Set(), out = [];
+  for (const x of scored) {
+    if (seen.has(x.s.sinner)) continue;
+    seen.add(x.s.sinner); out.push(x);
+    if (out.length >= 12) break;
+  }
+  return out;
 }
 
 /* 죄악 공명 잠재력 — 한 턴에 같은 죄악 스킬 2개=공명, 3개=완전 공명.
@@ -925,7 +932,7 @@ el("party-result").addEventListener("click", (e) => {
   const row = e.target.closest(".prec-item");
   if (!row) return;
   const s = sinnerById.get(+row.dataset.id);
-  if (s && party.length < 6 && !party.some((p) => p.id === s.id)) {
+  if (s && party.length < 6 && !party.some((p) => p.sinner === s.sinner)) {
     party.push(s); partyChanged(); runPartyRec();
   }
 });
@@ -937,7 +944,7 @@ function loadPartyIds(ids) {
   party.length = 0;
   ids.forEach((id) => {
     const s = sinnerById.get(+id);
-    if (s && party.length < 6 && !party.some((p) => p.id === s.id)) party.push(s);
+    if (s && party.length < 6 && !party.some((p) => p.sinner === s.sinner)) party.push(s);
   });
   partyChanged();
 }
