@@ -720,21 +720,21 @@ const SIN_COLOR = { 분노: "#d0552e", 색욕: "#d98a2b", 나태: "#d9c24a", 탐
 /* =============================================================
  *  ③ 파티 빌더 — 인격 선택 → 키워드 분석 → 추천 기프트·카드팩·시너지
  * ============================================================= */
-const party = [];   // 선택된 인격(최대 6)
+const PARTY_MAX = 7;   // 거울던전 6부터 7인 편성
+const party = [];      // 선택된 인격(최대 7, 수감자당 1명)
 const sinnerById = new Map();
 if (typeof SINNERS !== "undefined") for (const s of SINNERS) sinnerById.set(s.id, s);
 
-function syncChipsToParty() {
-  // 파티 인격의 상태이상 키워드를 칩에 '추가'로 반영(수동 선택은 지우지 않음)
-  const present = new Set(party.flatMap((s) => s.keywords));
-  el("party-keywords").querySelectorAll(".kw-chip").forEach((c) => {
-    if (present.has(c.dataset.kw)) c.classList.add("on");
-  });
+/* 분석에 쓸 키워드: 수동 칩이 있으면 그것만(우선), 없으면 파티 인격에서 유도.
+ * (수동으로 화상·진동만 골랐는데 파티의 다른 키워드가 섞여 들어가지 않게) */
+function currentKeywords() {
+  const chips = selectedChips("party-keywords");
+  return chips.length ? chips : [...new Set(party.flatMap((s) => s.keywords))];
 }
 function renderPartySlots() {
   const box = el("party-slots");
   let html = "";
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < PARTY_MAX; i++) {
     const s = party[i];
     if (s) {
       html += `<div class="pslot filled" data-i="${i}" title="클릭하면 제거">
@@ -748,7 +748,7 @@ function renderPartySlots() {
   }
   box.innerHTML = html;
 }
-function partyChanged() { renderPartySlots(); syncChipsToParty(); }
+function partyChanged() { renderPartySlots(); }
 
 if (typeof SINNERS !== "undefined") {
   el("party-isearch").addEventListener("input", () => {
@@ -768,7 +768,7 @@ if (typeof SINNERS !== "undefined") {
     const row = e.target.closest(".iresult");
     if (!row) return;
     const s = sinnerById.get(+row.dataset.id);
-    if (s && party.length < 6 && !party.some((p) => p.sinner === s.sinner)) { party.push(s); partyChanged(); }
+    if (s && party.length < PARTY_MAX && !party.some((p) => p.sinner === s.sinner)) { party.push(s); partyChanged(); }
     el("party-isearch").value = ""; el("party-iresults").innerHTML = "";
   });
   el("party-slots").addEventListener("click", (e) => {
@@ -861,9 +861,7 @@ function roleBalanceBlock(picked) {
 
 el("party-run").addEventListener("click", runPartyRec);
 function runPartyRec() {
-  // 칩 선택 + 이미 담은 파티 인격의 상태이상 키워드를 합쳐서 분석
-  // (공격타입 참격/관통/타격은 칩으로 직접 선택 — 의도치 않은 확산 방지)
-  const picked = [...new Set([...selectedChips("party-keywords"), ...party.flatMap((s) => s.keywords)])];
+  const picked = currentKeywords();
   const out = el("party-result");
   if (!picked.length) {
     out.innerHTML = `<div class="result-block warn">인격을 추가하거나 파티 키워드를 1개 이상 고르세요.</div>`;
@@ -884,8 +882,8 @@ function runPartyRec() {
       </div>
     </div>`).join("");
   const precBlock = `<div class="result-block"><h3>① 추천 인격 <span class="meta">(${picked.join(", ")})</span></h3>
-    <p class="hint">파티 키워드를 보유한 인격입니다. <b>클릭하면 파티 슬롯에 추가</b>됩니다 (현재 ${party.length}/6).</p>
-    ${party.length >= 6 ? `<p class="meta">파티가 가득 찼습니다 (6/6). 슬롯의 인격을 눌러 제거할 수 있습니다.</p>`
+    <p class="hint">파티 키워드를 보유한 인격입니다. <b>클릭하면 파티 슬롯에 추가</b>됩니다 (현재 ${party.length}/${PARTY_MAX}).</p>
+    ${party.length >= PARTY_MAX ? `<p class="meta">파티가 가득 찼습니다 (${PARTY_MAX}/${PARTY_MAX}). 슬롯의 인격을 눌러 제거할 수 있습니다.</p>`
       : (precRows || `<p class="meta">파티 키워드가 겹치는 인격이 없습니다.</p>`)}</div>`;
 
   const scored = MD_GIFTS.map((g) => {
@@ -895,7 +893,7 @@ function runPartyRec() {
     if (match.some((k) => SYNERGY_RULES[k] && SYNERGY_RULES[k].needs.includes(g.role))) score += 4;
     if (g.ex) score += 4; else if ((g.tier || 0) >= 3) score += 2;
     return { g, score, match };
-  }).filter((s) => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 12);
+  }).filter((s) => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 40);
 
   const giftRows = scored.map((s) => `
     <div class="rank-item rank-flex goto-gift" data-goto="${escAttr(s.g.name)}">
@@ -932,7 +930,7 @@ el("party-result").addEventListener("click", (e) => {
   const row = e.target.closest(".prec-item");
   if (!row) return;
   const s = sinnerById.get(+row.dataset.id);
-  if (s && party.length < 6 && !party.some((p) => p.sinner === s.sinner)) {
+  if (s && party.length < PARTY_MAX && !party.some((p) => p.sinner === s.sinner)) {
     party.push(s); partyChanged(); runPartyRec();
   }
 });
@@ -944,16 +942,16 @@ function loadPartyIds(ids) {
   party.length = 0;
   ids.forEach((id) => {
     const s = sinnerById.get(+id);
-    if (s && party.length < 6 && !party.some((p) => p.sinner === s.sinner)) party.push(s);
+    if (s && party.length < PARTY_MAX && !party.some((p) => p.sinner === s.sinner)) party.push(s);
   });
   partyChanged();
 }
 if (typeof SINNERS !== "undefined") {
   el("party-auto").addEventListener("click", () => {
-    const picked = [...new Set([...selectedChips("party-keywords"), ...party.flatMap((s) => s.keywords)])];
+    const picked = currentKeywords();
     if (!picked.length) { partyMsg("키워드를 1개 이상 고른 뒤 자동 구성하세요."); return; }
-    for (const { s } of recommendSinners(picked, party)) { if (party.length >= 6) break; party.push(s); }
-    partyChanged(); runPartyRec(); partyMsg(`상위 추천으로 파티를 채웠습니다 (${party.length}/6).`);
+    for (const { s } of recommendSinners(picked, party)) { if (party.length >= PARTY_MAX) break; party.push(s); }
+    partyChanged(); runPartyRec(); partyMsg(`상위 추천으로 파티를 채웠습니다 (${party.length}/${PARTY_MAX}).`);
   });
   el("party-save").addEventListener("click", () => {
     try { localStorage.setItem(PARTY_KEY, JSON.stringify(party.map((s) => s.id))); } catch (_) {}
