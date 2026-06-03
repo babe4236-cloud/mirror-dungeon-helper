@@ -224,13 +224,14 @@ body {
 .badge.enh2 { color: #7fc3ff; border-color: #2c3a5a; }
 .badge.curse { color: #c98ce0; border-color: #4a2f5a; }
 .badge.bless { color: #f0d98a; border-color: #5a4a1a; }
-/* 모달 즐겨찾기 별 */
+/* 모달 즐겨찾기 별 (제목 옆 인라인) */
 .gd-fav {
-  background: none; border: none; cursor: pointer; align-self: flex-start;
-  font-size: 1.4rem; line-height: 1; color: #4a4d59; padding: 2px 4px;
+  background: none; border: none; cursor: pointer;
+  font-size: 1.05rem; line-height: 1; color: #4a4d59;
+  padding: 0 2px; margin-left: 4px; vertical-align: 2px;
   transition: color .12s, transform .12s;
 }
-.gd-fav:hover { transform: scale(1.15); color: #e7c873; }
+.gd-fav:hover { transform: scale(1.2); color: #e7c873; }
 .gd-fav.on { color: #f4d98c; text-shadow: 0 0 8px rgba(244,217,140,0.6); }
 /* 한정 카드팩 표기 */
 .gift-limited {

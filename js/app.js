@@ -231,7 +231,7 @@ function giftDetail(g) {
   return `<div class="card-head">
       ${giftThumb(g)}
       <div class="card-head-body">
-        <h3>${esc(g.name)} ${en}</h3>
+        <h3>${esc(g.name)} ${en}<button class="gd-fav${isFav(g) ? " on" : ""}" data-fav="${esc(key)}" title="즐겨찾기에 추가">★</button></h3>
         <div class="badges">
           ${tierBadge(g)}
           ${g.sin ? `<span class="badge sin">${esc(g.sin)}</span>` : ""}
@@ -241,7 +241,6 @@ function giftDetail(g) {
           ${extra}
         </div>
       </div>
-      <button class="gd-fav${isFav(g) ? " on" : ""}" data-fav="${esc(key)}" title="즐겨찾기">★</button>
     </div>
     <div class="effect">${formatEffect(g.effect, true)}</div>
     <div class="meta">${esc(g.role)} ${cost}</div>
