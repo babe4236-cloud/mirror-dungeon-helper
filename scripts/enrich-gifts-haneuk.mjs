@@ -44,6 +44,20 @@ for (const g of GIFTS) {
   if (lim.length) g.limited = lim;
 }
 
+/* 수동 보정: haneuk egogift API에 누락됐지만 현행 게임에 실재하는 기프트
+ * (namu·위키로 확인). 이미지는 limbuscompany.wiki.gg에서 별도 수집. */
+const MANUAL = {
+  "봉이 인형": {
+    live: true, img: "assets/gifts/bongy_plush.png", limited: ["헬스 치킨"],
+    // 위키 원문의 미치환 플레이스홀더({0}/{1}) 정리
+    effect: "층 클리어 시 보유한 코스트가 1.5배씩 늘어남\n\n- 보유한 기프트 개수 1개당, 피해량 0.5% 증가 (최대 100%)\n- 보유한 기프트 개수 20개당, 턴 시작 시 강화 1 얻음 (최대 10)",
+  },
+};
+for (const g of GIFTS) {
+  const m = MANUAL[g.name];
+  if (m) { Object.assign(g, m); matched++; }
+}
+
 const out = header + "const GIFTS = " + JSON.stringify(GIFTS, null, 2) + ";\n";
 await writeFile(giftsPath, out, "utf8");
 console.log(`병합 완료: ${matched}/${GIFTS.length}개 매칭`);
