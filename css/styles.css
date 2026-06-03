@@ -662,6 +662,7 @@ body {
 .core-gift .gift-icon.xs { width: 26px; height: 26px; }
 .cg-name { word-break: keep-all; }
 .cg-t { color: var(--accent); font-weight: 700; }
+.cg-grp { color: var(--accent-2); font-size: 0.7rem; background: rgba(111,143,214,0.14); border-radius: 4px; padding: 0 4px; }
 .dmg-tips { margin: 4px 0 0; padding-left: 18px; font-size: 0.88rem; line-height: 1.6; }
 .dmg-tips li { margin: 4px 0; }
 

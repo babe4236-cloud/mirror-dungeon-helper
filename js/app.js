@@ -853,6 +853,18 @@ function roleBalanceBlock(picked) {
     <p class="hint">부여로 쌓고 발동으로 터뜨리는 균형이 중요합니다. <small class="meta">(역할은 효과 텍스트 기반 자동 분류라 일부 오차가 있을 수 있습니다.)</small></p>${warn}${bars}</div>`;
 }
 
+/* 집단(소속) 전용 기프트 판별 + 파티 매칭 */
+const GROUPS = typeof GIFT_GROUPS !== "undefined" ? GIFT_GROUPS : [];
+const giftFactions = (g) => GROUPS.filter((grp) => (g.effect || "").includes(grp)); // 효과에 언급된 집단
+// 주 효과(앞부분)가 집단 한정이면 '순수 전용' → 범용에서 제외
+const isExclusiveGift = (g) => { const head = (g.effect || "").slice(0, 30); return GROUPS.some((grp) => head.includes(grp)); };
+const partyFactionSet = () => {
+  const set = new Set();
+  party.forEach((s) => GROUPS.forEach((grp) => { if ((s.title || "").includes(grp)) set.add(grp); }));
+  return set;
+};
+const factionChip = (g, grps) => `<span class="goto-gift core-gift" data-goto="${escAttr(g.name)}">${giftThumb(g, "xs")}<span class="cg-name">${esc(g.name)}</span><small class="cg-grp">${grps.map(esc).join("·")}</small><small class="cg-t">${g.ex ? "EX" : "T" + g.tier}</small></span>`;
+
 el("party-run").addEventListener("click", runPartyRec);
 function runPartyRec() {
   const picked = currentKeywords();
@@ -880,15 +892,30 @@ function runPartyRec() {
     ${party.length >= PARTY_MAX ? `<p class="meta">파티가 가득 찼습니다 (${PARTY_MAX}/${PARTY_MAX}). 슬롯의 인격을 눌러 제거할 수 있습니다.</p>`
       : (precRows || `<p class="meta">파티 키워드가 겹치는 인격이 없습니다.</p>`)}</div>`;
 
-  // ② 추천 기프트 — 키워드별 칸으로 분리(각 키워드 매칭 기프트를 티어순)
+  // ② 추천 기프트 — 범용(전용 아님) 키워드별 칸 + 파티 맞춤(집단 전용)
+  const byTierCost = (a, b) => giftTierVal(b) - giftTierVal(a) || (b.cost || 0) - (a.cost || 0);
   const giftCols = picked.map((kw) => {
-    const gs = MD_GIFTS.filter((g) => g.keywords.includes(kw))
-      .sort((a, b) => giftTierVal(b) - giftTierVal(a) || (b.cost || 0) - (a.cost || 0)).slice(0, 14);
+    const gs = MD_GIFTS.filter((g) => g.keywords.includes(kw) && !isExclusiveGift(g)).sort(byTierCost).slice(0, 14);
     return `<div class="gift-kw-col">
       <div class="core-h"><img class="kwt-ic" src="assets/keywords/${encodeURIComponent(kw)}.webp" onerror="this.style.display='none'"> ${esc(kw)} <small class="meta">(${gs.length})</small></div>
       <div class="core-chips">${gs.map(coreGiftChip).join("") || '<small class="meta">없음</small>'}</div>
     </div>`;
   }).join("");
+
+  // 파티 맞춤 전용 기프트 (파티 인격의 집단에 맞춰 강해지는 것)
+  const pf = partyFactionSet();
+  let tailoredHtml;
+  if (!party.length) {
+    tailoredHtml = `<p class="meta">인격을 추가하면 그 집단(흑운회·약지·검계 등)에 맞춰 강해지는 <b>전용 기프트</b>를 따로 모아 보여줍니다.</p>`;
+  } else if (!pf.size) {
+    tailoredHtml = `<p class="meta">현재 파티 인격에 연결된 집단 전용 기프트가 없습니다. 위 범용 기프트를 챙기세요.</p>`;
+  } else {
+    const matched = MD_GIFTS.filter((g) => picked.some((k) => g.keywords.includes(k)) && giftFactions(g).some((f) => pf.has(f))).sort(byTierCost).slice(0, 24);
+    tailoredHtml = matched.length
+      ? `<p class="hint">파티 집단: ${[...pf].map((f) => `<span class="badge kw">${esc(f)}</span>`).join(" ")}</p>
+         <div class="core-chips">${matched.map((g) => factionChip(g, giftFactions(g).filter((f) => pf.has(f)))).join("")}</div>`
+      : `<p class="meta">파티 집단(${[...pf].join("·")})에 맞는 키워드 전용 기프트는 없습니다.</p>`;
+  }
 
   const packs = packsForKeywords(picked);
   const packRows = packs.length ? packs.map(({ p, hits }) =>
@@ -903,9 +930,12 @@ function runPartyRec() {
   out.innerHTML = `
     ${precBlock}
     ${resonanceBlock()}
-    <div class="result-block"><h3>② 추천 기프트 <span class="meta">(키워드별)</span></h3>
-      <p class="hint">키워드별 상위 티어 기프트입니다. 칩을 누르면 상세로 이동.</p>
+    <div class="result-block"><h3>② 추천 기프트 — 범용 <span class="meta">(누구나 챙기면 좋음)</span></h3>
+      <p class="hint">키워드별 상위 티어 <b>범용</b> 기프트입니다(특정 인격·집단 전용은 제외). 칩을 누르면 상세로 이동.</p>
       <div class="gift-kw-cols">${giftCols}</div></div>
+    <div class="result-block"><h3>🎯 파티 맞춤 전용 기프트</h3>
+      <p class="hint">지금 파티 인격의 <b>집단</b>에 맞춰 효과가 강해지는 전용 기프트입니다.</p>
+      ${tailoredHtml}</div>
     ${roleBalanceBlock(picked)}
     <div class="result-block"><h3>③ 추천 카드팩 (루트)</h3>
       <p class="hint">파티 키워드 기프트를 주는 사건이 있는 팩입니다. 이 팩을 골라 루트를 짜세요.</p>${packRows}</div>
