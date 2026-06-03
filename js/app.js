@@ -121,10 +121,11 @@ if (typeof RECIPES !== "undefined") {
 /* 조합식 재료/결과를 우리 기프트 데이터와 이름으로 연결해 등급·키워드 오버레이 */
 const giftByName = new Map();
 if (typeof GIFTS !== "undefined") for (const g of GIFTS) giftByName.set(normName(g.name), g);
-/* 정상 거울던전 E.G.O 기프트(티어 I~V)만. 티어 0은 테마팩/사건 전용 특수
- * 아이템(입장권·증표·매듭·꿈·장난감·동전 등)이라 검색/추천에서 제외.
- * (giftByName에는 남겨두어 조합식·사건 링크는 계속 해석됨) */
-const MD_GIFTS = (typeof GIFTS !== "undefined" ? GIFTS : []).filter((g) => g.tier > 0 || g.ex);
+/* 현행 거울던전 E.G.O 기프트(haneuk 라이브 목록 = g.live)만 검색/추천에 노출.
+ * 제외 대상: 티어 0 테마팩/사건 전용 특수 아이템(입장권·증표·매듭 등) +
+ *           위키에만 남은 구버전 삭제 기프트(잔영 시리즈 등, 이미지·난이도 없음).
+ * (giftByName에는 전체를 남겨두어 조합식·사건 링크는 계속 해석됨) */
+const MD_GIFTS = (typeof GIFTS !== "undefined" ? GIFTS : []).filter((g) => g.live);
 function recipeThumb(it, cls = "") {
   const g = giftByName.get(normName(it.name));
   if (g && g.img) return giftThumb({ img: it.img || g.img, tier: g.tier, keywords: g.keywords }, cls);

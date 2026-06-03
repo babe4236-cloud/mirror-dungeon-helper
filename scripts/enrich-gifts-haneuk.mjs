@@ -30,9 +30,10 @@ let matched = 0;
 for (const g of GIFTS) {
   const h = byName.get(norm(g.name));
   // 기존 보정 필드 제거(재실행 멱등성)
-  delete g.diff; delete g.enhance; delete g.curse; delete g.bless; delete g.ex; delete g.limited;
+  delete g.diff; delete g.enhance; delete g.curse; delete g.bless; delete g.ex; delete g.limited; delete g.live;
   if (!h) continue;
   matched++;
+  g.live = true; // haneuk 라이브 목록에 존재 = 현행 기프트
   const diff = (h.grades || []).map((x) => GRADE_KO[x]).filter(Boolean);
   if (diff.length) g.diff = diff;
   if (h.enhanceYn === "Y") g.enhance = true;
