@@ -784,13 +784,47 @@ function packsForKeywords(keywords) {
   return out.sort((a, b) => b.hits.length - a.hits.length).slice(0, 5);
 }
 
-el("party-run").addEventListener("click", () => {
-  const picked = selectedChips("party-keywords");
+/* 파티 키워드에 맞는 추천 인격 (보유 키워드 겹침 + 희귀도 가중) */
+const RARITY_STARS = { "000": "★★★", "00": "★★", "0": "★" };
+function recommendSinners(keywords, exclude) {
+  if (typeof SINNERS === "undefined") return [];
+  const ex = new Set(exclude.map((s) => s.id));
+  const rw = { "000": 3, "00": 2, "0": 1 };
+  return SINNERS.map((s) => {
+    const match = (s.keywords || []).filter((k) => keywords.includes(k));
+    return { s, match, score: match.length * 10 + (rw[s.rarity] || 0) };
+  }).filter((x) => x.match.length && !ex.has(x.s.id))
+    .sort((a, b) => b.score - a.score || b.match.length - a.match.length)
+    .slice(0, 12);
+}
+
+el("party-run").addEventListener("click", runPartyRec);
+function runPartyRec() {
+  // 칩 선택 + 이미 담은 파티 인격의 키워드를 합쳐서 분석
+  const picked = [...new Set([...selectedChips("party-keywords"), ...party.flatMap((s) => s.keywords)])];
   const out = el("party-result");
   if (!picked.length) {
-    out.innerHTML = `<div class="result-block warn">인격을 선택하거나 키워드를 1개 이상 고르세요.</div>`;
+    out.innerHTML = `<div class="result-block warn">인격을 추가하거나 파티 키워드를 1개 이상 고르세요.</div>`;
     return;
   }
+
+  // ⓪ 추천 인격
+  const recs = recommendSinners(picked, party);
+  const precRows = recs.map(({ s, match }) => `
+    <div class="rank-item rank-flex prec-item" data-id="${s.id}" title="클릭하면 파티에 추가">
+      <img class="prec-art" src="${esc(s.art || s.img || "")}" loading="lazy" onerror="this.style.visibility='hidden'">
+      <div>
+        <b>${esc(s.name)}</b> <small class="meta">${esc(s.title)}</small>
+        <span class="badge sin">${sinIcon(s.sin)}${esc(s.sin)}</span>
+        <small class="rar">${RARITY_STARS[s.rarity] || ""}</small>
+        <span class="prec-add">＋ 파티에</span><br>
+        ${match.map((k) => `<span class="badge kw"><img class="kwt-ic" src="assets/keywords/${encodeURIComponent(k)}.webp" onerror="this.style.display='none'">${esc(k)}</span>`).join("")}
+      </div>
+    </div>`).join("");
+  const precBlock = `<div class="result-block"><h3>① 추천 인격 <span class="meta">(${picked.join(", ")})</span></h3>
+    <p class="hint">파티 키워드를 보유한 인격입니다. <b>클릭하면 파티 슬롯에 추가</b>됩니다 (현재 ${party.length}/6).</p>
+    ${party.length >= 6 ? `<p class="meta">파티가 가득 찼습니다 (6/6). 슬롯의 인격을 눌러 제거할 수 있습니다.</p>`
+      : (precRows || `<p class="meta">파티 키워드가 겹치는 인격이 없습니다.</p>`)}</div>`;
 
   const scored = MD_GIFTS.map((g) => {
     const match = g.keywords.filter((k) => picked.includes(k));
@@ -822,11 +856,21 @@ el("party-run").addEventListener("click", () => {
     ? `<div class="rank-item"><b>${kw}</b> — ${esc(SYNERGY_RULES[kw].tip)} <small class="meta">(필요 역할: ${SYNERGY_RULES[kw].needs.join("·")})</small></div>` : "").join("");
 
   out.innerHTML = `
-    <div class="result-block"><h3>① 추천 기프트 <span class="meta">(${picked.join(", ")})</span></h3>
+    ${precBlock}
+    <div class="result-block"><h3>② 추천 기프트 <span class="meta">(${picked.join(", ")})</span></h3>
       <p class="hint">우선순위: <b>${scored.slice(0, 3).map((s) => s.g.name).join(" → ")}</b> · 카드를 누르면 해당 기프트로 이동</p>${giftRows}</div>
-    <div class="result-block"><h3>② 추천 카드팩 (루트)</h3>
+    <div class="result-block"><h3>③ 추천 카드팩 (루트)</h3>
       <p class="hint">파티 키워드 기프트를 주는 사건이 있는 팩입니다. 이 팩을 골라 루트를 짜세요.</p>${packRows}</div>
-    <div class="result-block"><h3>③ 딜 시너지 팁</h3>${tips}</div>`;
+    <div class="result-block"><h3>④ 딜 시너지 팁</h3>${tips}</div>`;
+}
+/* 추천 인격 클릭 → 파티에 추가 후 추천 갱신 */
+el("party-result").addEventListener("click", (e) => {
+  const row = e.target.closest(".prec-item");
+  if (!row) return;
+  const s = sinnerById.get(+row.dataset.id);
+  if (s && party.length < 6 && !party.some((p) => p.id === s.id)) {
+    party.push(s); partyChanged(); runPartyRec();
+  }
 });
 
 /* =============================================================
