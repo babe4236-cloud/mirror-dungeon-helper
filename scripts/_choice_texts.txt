@@ -1,0 +1,374 @@
+"Are you from up north?"
+"Nothing. Have a nice trip.
+"Nothing. Have a nice trip."
+"What are the benefits of having four arms?"
+... Bandages.
+... Chains.
+A duck.
+A powerful-looking weapon.
+A rabbit.
+A useful-looking gear.
+Accept and investigate.
+Accept blood.
+Accept the deal.
+Accept the surgery.
+Accept.
+Admonish the merchant, claim that the gear was stolen from us
+Agree that they are stars.
+Agree to help, and ask for a bass guitar.
+Agree to help, and ask for a guitar.
+Alert it truthfully.
+An Inquisitor is leading our evacuation.
+Approach it.
+Approach the bed.
+Approach them.
+Approach.
+Are swords really all that, though?
+Ask for an explanation of the “town”.
+Ask if there are any other citizens.
+Ask to shake hands.
+Ask what it believes in.
+Assume a stance like I'm about to draw the sword.
+Attempt a preemptive attack.
+Avert your eyes.
+Avoid the trap.
+Await orders.
+Back off and withdraw your hand.
+Backward.
+Bandage its wounds.
+Block your ears.
+Brandish the Chalice of Trickle-down. Choice unlocked with the 'Chalice of Trickle-down'
+Break off a thorn.
+Break the light and run away.
+Break the spring's entryway to let more blood out.
+Bring down the cairn.
+Change comes for everything, eventually.
+Check the generator, but don't take your eyes off the webs.
+Check the generator.
+Chicken’s chicken, duh.
+Choose the angry skull.
+Choose the deranged skull.
+Choose the laughing skull.
+Close your eyes.
+Comfort the pink droplet.
+Concavity
+Confess the truth.
+Cry and cry until you sink.
+Cut the cables.
+Cut the ring.
+Cut the tip of a finger to drop my blood on the wire.
+Do not approach the bed.
+Don't command anything.
+Don't cut the ring.
+Don't do that.
+Don't follow anyone.
+Don't make any expression.
+Don't pick up the block.
+Don't pick up the weapon.
+Don't send anyone.
+Donate blood.
+Don’t give water.
+Drink water.
+Duck and cover.
+East, to where the warning hand points.
+Eat it.
+Economy class isn't so bad.
+Eh, not really.
+Embrace the Sinners.
+Enter the haze.
+Explain Ren—Humanity (仁).
+Explain Yong—Courage (勇).
+Explain Zhi—Wisdom (智).
+Express doubt.
+Express willingness to shoot the bullet myself.
+Feed it the blood of the Sinners
+Fill it with a Sinner's blood.
+Find a nearby shelter.
+Fine something to break their fall.
+Fix the entity's flickering fluorescent lights.
+Follow the Operation team.
+Follow the old man.
+Follow the youth.
+Follow them outside.
+Force the door open.
+Forward.
+Gather the candles together.
+Get closer.
+Get the huge Bongy plushie.
+Get the medium-sized Bongy plushie.
+Get the small Bongy plushie.
+Give a few subtle hints.
+Give it more water.
+Give up on them.
+Give water.
+Go back the way you came instead of taking the main road.
+Go under the umbrella and wait until the rain stops.
+Gobble up the stew.
+Gotta be the drumsticks, all rich and juicy.
+Grab something made of bones and musculature.
+Grab something made of flesh and animal hide.
+Guide it personally.
+Have the Sinners forcibly grab the head and the flask to lift it up.
+Hellterfly’s Dream
+Help the bell find balance.
+Hit the switch.
+Hug and shake the giant body.
+I command death.
+I command life.
+I do.
+I don't know how to live without alcohol.
+I don't.
+I have no thoughts regarding the matter. A pity, though.
+I know we'll do fine. Like we always do.
+I like the idea, but there's no way it'll work right.
+I pity the one that binds.
+I pity the ones that are bound.
+I think we will smile.
+I've failed to protect others, too.
+Ignore it and leave.
+Ignore it completely.
+Ignore the poster.
+Ignore the voice. Keep going.
+Ignore them and move on.
+Ignore them.
+Investigate if this has anything to do with a Bloodfiend.
+Investigate.
+It's the City. That's just what happens to small fries getting mixed up in large-scale conflicts.
+Just take a quick look, then leave.
+Just watch the intruder run away.
+Keep looking.
+Knock down the sign.
+Learn CQB.
+Learn the art of war.
+Leave it be.
+Leave it there.
+Leave it.
+Leave the hallway.
+Leave the painting be.
+Leave the room.
+Leave the suppression to the researchers.
+Leave the sword, let's leave.
+Leave without answering.
+Leave without listening.
+Leave without pressing the switch.
+Leave.
+Leave. We're satisfied.
+Lend him an E-Type Dimensional Dagger.
+Let one person drink it all.
+Let the other people have it first.
+Let's not mess with the coffin and leave.
+Let's see what's inside the coffin.
+Listen closer.
+Listen to the breathing.
+Look around some more.
+Look for anything useful on the floor.
+Look the mist in the eye.
+Midwinter Nightmare
+Mimic the cry.
+Move on without resting.
+Nod.
+Nonstandard-duty Battery
+North, to where the burst-open arm points.
+Not true. Slash, Pierce, and Blunt all have their uses.
+Observe the desk.
+Offer to take it with us if she has no need for it.
+Open the coffin.
+Open the door with the Operation Authorization Card. Choice unlocked with the E.G.O Gift "Operation Authorization Card"
+Order a Sinner to conduct "Insight Work."
+Order a Sinner to conduct "Repression Work."
+Order it to carry luggage faster.
+Order it to carry luggage.
+Order it to do nothing.
+Order the Sinner with Ashen Constellation's Blessing to conduct "Insight Work" on the Abnormality. Choice unlocked with the E.G.O Gift "Ashen Constellation's Blessing"
+Order the Sinner with Trauma Shield to conduct "Insight Work" on the Abnormality. Choice unlocked with the E.G.O Gift "Trauma Shield"
+Pay for the gear.
+Peek at the book.
+Pet the fox.
+Pick a flower.
+Pick a rose.
+Pick up a respirator and put it in its mouth.
+Pick up the block.
+Pick up the weapon.
+Place a coin.
+Place a stone over the tower.
+Play paper.
+Play rock.
+Play scissors.
+Plug another cable into the electric sheep.
+Plug the spring to stop it from drinking blood.
+Point it in the wrong direction.
+Point the direction it should go.
+Pop its sac.
+Pray before One Sin and Hundreds of Good Deeds.
+Pray before the statue.
+Present the Warning Notice. Choice unlocked with the 'Warning Notice'
+Press the droplet-shaped button.
+Press the lightning-shaped button.
+Pretend to join them.
+Proceed with the authentication.
+Pull out the intravenous line on its body.
+Pull out the umbrellas.
+Purchase the pills.
+Pursue the fleeing intruder.
+Push it further.
+Push the hand away.
+Put the pink droplet back into its pink body.
+Rapidly mash both buttons.
+Reach out our arms to grab the falling civilian.
+Reach out to grab its hand.
+Reach out to touch it.
+Reach out.
+Read the tablet.
+Receive a pass.
+Refuse it.
+Refuse the authentication process.
+Refuse to help.
+Refuse.
+Remove all talismans.
+Remove the brambles.
+Remove the doll’s talismans.
+Remove the head from the urn.
+Remove the nails.
+Remove the wall talismans.
+Rest a little.
+Return the gaze.
+Right. Slashing is the way to go when wielding a blade.
+Run for the bus.
+Run off.
+Sample the green substance.
+Save the civilians.
+Save the panicked employees, too.
+Say "I think I've seen him before."
+Say "Nope, never seen him before."
+Say that it passed.
+Say that it's too dusty to tell.
+Say that you can see it well.
+Say that you can't see it well.
+Say that you don't know.
+Say that you have.
+Say that you haven't put off any.
+Say that you will sink together.
+Say that you're just passing by.
+Say that you're willing to hear the stories.
+Say that you're with the Blade Lineage.
+Scoop up some Enkephalin.
+Scrape out the letters.
+Search to find where the voice is coming from.
+See if anything can be done to help.
+Seems dangerous. Let's move on.
+Seize the spiral.
+Send a Sinner to assist the W Corp. Agent.
+Sentence the Heishou to a weeklong detention in binds.
+Shake hands.
+Shake your head.
+Share it with everyone.
+Show them the Harestride and tell them you're new. Choice unlocked with the E.G.O Gift "Harestride"
+Sit and wait.
+Slap away the hand.
+Slip them into our bags and pretend we ate them.
+Snap the twig.
+Sneak by.
+Sneak up and remove a part of the wire.
+Snuff out the candles.
+Spin the roulette.
+Splash around together.
+Spray blood on the coffin.
+Sprinkle water.
+Stand still.
+Stare at the webs.
+Step in and help with the suppression.
+Still, it must be said that what is right, is right.
+Stop by the carousel.
+Stop.
+Stroll this city where there is no one and no one to meet.
+Subaquatic Blossom
+Suppress the monster.
+Swords are indeed the king of all weapons. Hail!
+T-the Yurodiviye of the City, Unite!
+Take a break where you're standing.
+Take a break.
+Take a closer look at the factory owner and the employee.
+Take a contract.
+Take a different route.
+Take a look around the factory.
+Take a momentary break.
+Take a seat.
+Take a small telepole.
+Take both
+Take it.
+Take one of the prayer books from its body.
+Take the Boombox.
+Take the Heishou - You's talon—the Xueyan Blade.
+Take the brass ring.
+Take the byway instead of taking the main road.
+Take the cauldron.
+Take the cleaning solution spray.
+Take the combat boots with spiky bits on them.
+Take the flaming gauntlet.
+Take the gas canister.
+Take the gathered umbrellas.
+Take the hearthflame.
+Take the painting.
+Take the poster, and follow the directions on the note.
+Take the souvenir and leave.
+Take your leave.
+Talk to One Sin and Hundreds of Good Deeds.
+Talk to them.
+Tear off the gore.
+Tell her that we don't need it.
+Tell it that you took a tour.
+Tell the figure that it's nothing.
+Tell the shooter that you're not on its side.
+Tell the shooter that you're on its side.
+Tell the shooter to look at the pendant on its neck.
+Tell the truth.
+Tell them that we're from the Disciplinary Team.
+Tell them that we're from the Upper Layer, and present our E.G.O Gifts. Choice unlocked by carrying 5+ Theme Pack-exclusive E.G.O Gifts from "The Noon of Violet" and "Hatred and Despair" Packs
+Tell them those are marbles.
+Tell them you're a Hare returned from a duty elsewhere.
+That's enough looking around. Let's move on.
+The breast, of course, unsullied and spotless.
+This time, give up on them.
+Throw the green substance at it.
+Throw the screw into the factory.
+Try to console them.
+Try to help.
+Try to save the employees.
+Try to shake its hands anyway.
+Try to stop them.
+Turn a blind eye.
+Turn around.
+Turn away from the scene.
+Turn back.
+Uncapped Defibrilator
+Unfortunately, war with the Blade Lineage seems to be the only option.
+Unravel the brambles.
+Unsheathe the sword and hold it on my side.
+Walk away.
+Walk into the mist.
+Walk past it.
+Walk past the city.
+Watch.
+Wave back.
+We could fail. Like we always do.
+We don't live in a binary world defined only by good and evil.
+We have to put a stop to this.
+We're here to help the Inquisitors.
+We're not eating that. We don't even know what that is.
+We're the 'samples'.
+Weather the rain and leave the place.
+West, to where the broken hand points.
+What if you were to bring an end to peace?
+What is 'right' and what is 'wrong'… is it really that important to tell which is which? Say that what really matters is something else.
+Write [Dumbass].
+Write [Goodbye].
+Write [Hello].
+Wrong place at the wrong time, man.
+Yank out all of its telepoles.
+Yank out the fluorescent lights.
+You SHOULD buy a first class ticket.
+You are not special.
+You are special.
+You have the wrong person.
+You saw nothing.
+You should buy a first class ticket.

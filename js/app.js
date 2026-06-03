@@ -1,0 +1,849 @@
+/* =============================================================
+ *  거울던전 도우미 — 앱 로직
+ * ============================================================= */
+
+/* ---------- 탭 전환 ---------- */
+document.getElementById("tabs").addEventListener("click", (e) => {
+  const btn = e.target.closest(".tab");
+  if (!btn) return;
+  document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+});
+
+/* ---------- 유틸 ---------- */
+const el = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const thumb = (src, cls = "thumb") =>
+  src ? `<img class="${cls}" src="${esc(src)}" alt="" loading="lazy" onerror="this.style.display='none'">` : "";
+
+/* 키워드 하이라이트(아이콘+강조) + 툴팁 */
+const escAttr = (s) => esc(s).replace(/"/g, "&quot;");
+let KW_RE = null;
+const KW_MAP = new Map();
+// 일반어와 겹쳐 오매칭되는 키워드 제외 (예: "소수점 버림"의 '버림')
+const KW_BLACKLIST = new Set(["버림", "부하", "화력", "해금", "영감"]);
+if (typeof KEYWORD_INFO !== "undefined" && KEYWORD_INFO.length) {
+  const list = KEYWORD_INFO.filter((k) => !KW_BLACKLIST.has(k.name));
+  for (const k of list) KW_MAP.set(k.name, k);
+  const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  KW_RE = new RegExp("(" + list.map((k) => escRe(k.name)).join("|") + ")", "g");
+}
+function highlightKeywords(escaped) {
+  if (!KW_RE) return escaped;
+  return escaped.replace(KW_RE, (m) => {
+    const k = KW_MAP.get(m);
+    if (!k) return m;
+    const icon = `<img class="kwt-ic" src="assets/keywords/${encodeURIComponent(k.name)}.webp" alt="" onerror="this.style.display='none'">`;
+    const desc = k.desc ? ` data-desc="${escAttr(k.desc)}"` : "";
+    return `<span class="kwt"${desc}>${icon}${m}</span>`;
+  });
+}
+
+/* 효과 설명을 문단·하위항목(- )으로 구분해 렌더 + 키워드 하이라이트 */
+function formatEffect(text) {
+  if (!text) return "";
+  return text.split("\n").map((line) => {
+    const t = line.trim();
+    if (!t) return '<div class="eff-gap"></div>';
+    if (/^[-·•]/.test(t)) return `<div class="eff-line eff-sub">${highlightKeywords(esc(t.replace(/^[-·•]\s*/, "")))}</div>`;
+    return `<div class="eff-line">${highlightKeywords(esc(t))}</div>`;
+  }).join("");
+}
+
+/* 기프트 아이콘: 일러스트 + 등급(I~V) 배지 + 키워드 아이콘 오버레이 (게임 스타일) */
+const TIER_ROMAN = ["", "I", "II", "III", "IV", "V"];
+function giftThumb(g, cls = "") {
+  if (!g.img) return "";
+  const tier = TIER_ROMAN[g.tier] || "";
+  const kw = (g.keywords || [])[0];
+  const kwIcon = kw
+    ? `<img class="kw-icon" src="assets/keywords/${encodeURIComponent(kw)}.webp" alt="${esc(kw)}" loading="lazy" onerror="this.style.display='none'">`
+    : "";
+  return `<div class="gift-icon ${cls}">
+    <img class="thumb" src="${esc(g.img)}" alt="" loading="lazy" onerror="this.style.display='none'">
+    ${tier ? `<span class="tier-badge">${tier}</span>` : ""}
+    ${kwIcon}
+  </div>`;
+}
+
+/* 조합식 인덱스: 기프트명 → (결과로 만드는 레시피 / 재료로 쓰이는 레시피) */
+const normName = (s) => String(s).toLowerCase().replace(/[‘’'\s]/g, "").replace(/[^0-9a-z가-힣]/g, "");
+const recipeByResult = new Map();
+const recipeByIngredient = new Map();
+if (typeof RECIPES !== "undefined") {
+  for (const r of RECIPES) {
+    const rk = normName(r.result.name);
+    (recipeByResult.get(rk) || recipeByResult.set(rk, []).get(rk)).push(r);
+    for (const ing of r.ingredients) {
+      const ik = normName(ing.name);
+      (recipeByIngredient.get(ik) || recipeByIngredient.set(ik, []).get(ik)).push(r);
+    }
+  }
+}
+/* 조합식 재료/결과를 우리 기프트 데이터와 이름으로 연결해 등급·키워드 오버레이 */
+const giftByName = new Map();
+if (typeof GIFTS !== "undefined") for (const g of GIFTS) giftByName.set(normName(g.name), g);
+function recipeThumb(it, cls = "") {
+  const g = giftByName.get(normName(it.name));
+  if (g && g.img) return giftThumb({ img: it.img || g.img, tier: g.tier, keywords: g.keywords }, cls);
+  return `<div class="gift-icon ${cls}">${thumb(it.img)}</div>`;
+}
+const rmini = (it) =>
+  `<span class="rmini goto-gift" data-goto="${escAttr(it.name)}">${recipeThumb(it, "xs")}${esc(it.name)}</span>`;
+
+/* 재료 목록을 한 박스로 (줄바꿈이 박스 안에 갇혀 가독성↑) */
+const ingBox = (ingredients, no) =>
+  `<div class="recipe-box">${no ? `<span class="rbox-no">${no}</span>` : ""}<div class="rbox-items">${ingredients.map(rmini).join('<span class="recipe-op">+</span>')}</div></div>`;
+
+/* 기프트 카드용: 이 기프트와 관련된 조합식 */
+function giftRecipeInfo(g) {
+  const k = normName(g.name);
+  const made = recipeByResult.get(k);
+  const usedIn = recipeByIngredient.get(k);
+  let html = "";
+  if (made) {
+    const multi = made.length > 1;
+    const boxes = made.map((r, i) => ingBox(r.ingredients, multi ? `조합 ${i + 1}` : "")).join("");
+    html += `<div class="recipe-group"><div class="ri-label">🔁 조합으로 획득${multi ? ` · ${made.length}가지` : ""}</div>${boxes}</div>`;
+  }
+  if (usedIn) {
+    const results = [...new Map(usedIn.map((r) => [normName(r.result.name), r.result])).values()];
+    html += `<div class="recipe-group"><div class="ri-label">🔁 조합 재료로 쓰임 → 결과</div><div class="recipe-box"><div class="rbox-items">${results.map(rmini).join("")}</div></div></div>`;
+  }
+  return html;
+}
+
+/* 사건 카드용: 이 사건의 보상 기프트가 들어가는 조합식 */
+function eventRecipeInfo(ev) {
+  if (typeof RECIPES === "undefined") return "";
+  const blob = ev.choices.map((c) => `${c.text} ${c.info} ${c.success} ${c.fail}`).join(" ");
+  const seen = new Set();
+  const matched = [];
+  for (const r of RECIPES) {
+    if (seen.has(r.id)) continue;
+    const hit = r.ingredients.some((i) => i.name && blob.includes(i.name));
+    if (hit) { seen.add(r.id); matched.push(r); }
+  }
+  if (!matched.length) return "";
+  const boxes = matched.map((r) =>
+    `<div class="recipe-box"><div class="rbox-items">${r.ingredients.map(rmini).join('<span class="recipe-op">+</span>')}<span class="recipe-op">=</span>${rmini(r.result)}</div></div>`
+  ).join("");
+  return `<div class="recipe-group"><div class="ri-label">🔁 이 사건 기프트로 만드는 조합식</div>${boxes}</div>`;
+}
+
+function fillSelect(select, items) {
+  items.forEach((v) => {
+    const o = document.createElement("option");
+    o.value = v; o.textContent = v;
+    select.appendChild(o);
+  });
+}
+
+/* =============================================================
+ *  ① 기프트 검색
+ * ============================================================= */
+fillSelect(el("gift-sin"), SINS);
+// 키워드/등급은 실제 데이터에서 동적으로 채움(공격타입·고등급 포함)
+fillSelect(el("gift-keyword"), [...new Set(GIFTS.flatMap((g) => g.keywords))].sort());
+fillSelect(el("gift-tier"), [...new Set(GIFTS.map((g) => g.tier))].filter(Boolean).sort()
+  .map((t) => String(t)));
+
+function giftCard(g) {
+  const kw = g.keywords.map((k) => `<span class="badge kw">${esc(k)}</span>`).join("");
+  const cost = g.cost ? `· 가격 ${g.cost}` : "";
+  const en = g.name_en && g.name_en !== g.name ? `<span class="en">${esc(g.name_en)}</span>` : "";
+  return `<div class="card" data-gname="${esc(normName(g.name))}">
+    <div class="card-head">
+      ${giftThumb(g)}
+      <div class="card-head-body">
+        <h3>${esc(g.name)} ${en}</h3>
+        <div class="badges">
+          <span class="badge tier">T${g.tier}</span>
+          ${g.sin ? `<span class="badge sin">${esc(g.sin)}</span>` : ""}
+          ${kw}
+          <span class="badge">${esc(g.role)}</span>
+        </div>
+      </div>
+    </div>
+    <div class="effect">${formatEffect(g.effect)}</div>
+    <div class="meta">${esc(g.role)} ${cost}</div>
+    ${giftRecipeInfo(g)}
+  </div>`;
+}
+
+function renderGifts() {
+  const q = el("gift-search").value.trim().toLowerCase();
+  const sin = el("gift-sin").value;
+  const kw = el("gift-keyword").value;
+  const role = el("gift-role").value;
+  const tier = el("gift-tier").value;
+
+  const list = GIFTS.filter((g) => {
+    if (sin && g.sin !== sin) return false;
+    if (kw && !g.keywords.includes(kw)) return false;
+    if (role && g.role !== role) return false;
+    if (tier && String(g.tier) !== tier) return false;
+    if (q && !(`${g.name} ${g.name_en || ""} ${g.effect}`.toLowerCase().includes(q))) return false;
+    return true;
+  });
+
+  el("gift-count").textContent = `${list.length}개 / 전체 ${GIFTS.length}개`;
+  el("gift-list").innerHTML = list.length
+    ? list.map(giftCard).join("")
+    : `<p class="empty">조건에 맞는 기프트가 없습니다.</p>`;
+}
+
+["gift-search", "gift-sin", "gift-keyword", "gift-role", "gift-tier"].forEach((id) =>
+  el(id).addEventListener("input", renderGifts)
+);
+renderGifts();
+
+/* =============================================================
+ *  ② 사건 Q&A
+ * ============================================================= */
+const eventPacks = (ev) => (ev.packs && ev.packs.length ? ev.packs : ["공용 사건"]);
+fillSelect(el("event-theme"), [...new Set(EVENTS.flatMap(eventPacks))].sort((a, b) => a.localeCompare(b, "ko")));
+
+/* 갤러리 카드 (그리드): 이미지 + 제목 */
+function eventCard(ev) {
+  return `<div class="ev-card" data-id="${esc(ev.id)}" title="${esc(ev.name)}">
+    <img class="ev-art" src="${esc(ev.img || "")}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+    <div class="ev-title">${esc(ev.name)}</div>
+  </div>`;
+}
+
+/* 상세(모달): 이미지 + 스토리 + 획득 기프트 + 선택지 + 조합식 */
+function eventDetail(ev) {
+  const packs = eventPacks(ev).map((p) => `<span class="badge kw">${esc(p)}</span>`).join("");
+  const gifts = (ev.gifts || []).length
+    ? `<div class="ev-gifts"><div class="ri-label">획득 가능 기프트</div><div class="rbox-items">${ev.gifts.map((n) => {
+        const g = giftByName.get(normName(n));
+        return g
+          ? `<span class="rmini goto-gift" data-goto="${escAttr(n)}">${recipeThumb({ name: n, img: g.img }, "xs")}${esc(n)}</span>`
+          : `<span class="rmini">${esc(n)}</span>`;
+      }).join("")}</div></div>` : "";
+  const choices = ev.choices.map((c) => {
+    const info = c.info ? ` <span class="meta">— ${esc(c.info)}</span>` : "";
+    const sf = [
+      c.success && `<div class="res good">✔ 성공: ${esc(c.success)}</div>`,
+      c.fail && `<div class="res bad">✘ 실패: ${esc(c.fail)}</div>`
+    ].filter(Boolean).join("");
+    return `<div class="choice"><div class="ctext">▶ ${esc(c.text)}${info}</div>${sf}</div>`;
+  }).join("");
+  return `<div class="ev-detail-head">
+      <img class="ev-detail-art" src="${esc(ev.img || "")}" alt="" onerror="this.style.display='none'">
+      <div class="ev-detail-info">
+        <h3>${esc(ev.name)}</h3>
+        <div class="badges">${packs}</div>
+        ${ev.desc ? `<div class="ev-desc">${formatEffect(ev.desc)}</div>` : ""}
+      </div>
+    </div>
+    ${gifts}
+    <div class="ev-choices">${choices}</div>
+    ${eventRecipeInfo(ev)}`;
+}
+
+function renderEvents() {
+  const q = el("event-search").value.trim().toLowerCase();
+  const theme = el("event-theme").value;
+  const list = EVENTS.filter((ev) => {
+    if (theme && !eventPacks(ev).includes(theme)) return false;
+    if (q) {
+      const hay = `${ev.name} ${ev.desc || ""} ${ev.choices.map((c) => `${c.text} ${c.info} ${c.success} ${c.fail}`).join(" ")}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  el("event-count").textContent = `${list.length}개 / 전체 ${EVENTS.length}개`;
+  el("event-list").innerHTML = list.length
+    ? list.map(eventCard).join("")
+    : `<p class="empty">조건에 맞는 사건이 없습니다.</p>`;
+}
+function openEventModal(id) {
+  const ev = EVENTS.find((x) => x.id === id);
+  if (!ev) return;
+  el("event-modal").querySelector(".sm-body").innerHTML = eventDetail(ev);
+  el("event-modal").classList.add("open");
+}
+["event-search", "event-theme"].forEach((id) => el(id).addEventListener("input", renderEvents));
+el("event-list").addEventListener("click", (e) => {
+  const card = e.target.closest(".ev-card");
+  if (card) openEventModal(card.dataset.id);
+});
+el("event-modal-close").addEventListener("click", () => el("event-modal").classList.remove("open"));
+el("event-modal").addEventListener("click", (e) => { if (e.target.id === "event-modal") el("event-modal").classList.remove("open"); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") el("event-modal").classList.remove("open"); });
+renderEvents();
+
+/* =============================================================
+ *  카드팩
+ * ============================================================= */
+/* 갤러리 카드: 세로 카드팩 아트(이름 포함) */
+function packCard(p) {
+  return `<div class="pack-card" data-id="${p.id}" title="${esc(p.title)}">
+    <img class="pack-art" src="${esc(p.img || "")}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+    ${p.events.length ? `<span class="pack-evcount">사건 ${p.events.length}</span>` : ""}
+  </div>`;
+}
+
+/* 상세(모달): 카드팩 아트 + 정보 + 등장 사건(선택지·보상) */
+function packDetail(p) {
+  const diff = p.difficulties.map((d) => `<span class="badge">${esc(d)}</span>`).join("");
+  const floors = p.floors.length ? `<span class="badge">층 ${[...new Set(p.floors)].join("·")}</span>` : "";
+  const evs = p.events.length
+    ? p.events.map((ev) => {
+        const choices = ev.choices.map((c) => {
+          const info = c.info ? ` <span class="meta">— ${esc(c.info)}</span>` : "";
+          const sf = [
+            c.success && `<div class="res good">✔ ${esc(c.success)}</div>`,
+            c.fail && `<div class="res bad">✘ ${esc(c.fail)}</div>`
+          ].filter(Boolean).join("");
+          return `<div class="choice"><div class="ctext">▶ ${esc(c.text)}${info}</div>${sf}</div>`;
+        }).join("");
+        return `<div class="pack-event"><b><img class="pack-ev-thumb" src="${esc(ev.img || "")}" alt="" loading="lazy" onerror="this.style.display='none'">◆ ${esc(ev.title)}</b>${choices}</div>`;
+      }).join("")
+    : `<p class="meta">고유 사건이 없는 팩입니다.</p>`;
+  return `<div class="ev-detail-head">
+      <img class="pack-detail-art" src="${esc(p.img || "")}" alt="" onerror="this.style.display='none'">
+      <div class="ev-detail-info">
+        <h3>${esc(p.title)}</h3>
+        <div class="badges"><span class="badge kw">${esc(p.theme)}</span>${floors}${diff}<span class="badge">사건 ${p.events.length}</span></div>
+        ${p.desc ? `<div class="meta">${esc(p.desc)}</div>` : ""}
+      </div>
+    </div>
+    <div class="ev-choices">${evs}</div>`;
+}
+
+function renderPacks() {
+  const q = el("pack-search").value.trim().toLowerCase();
+  const onlyEv = el("pack-only-events").checked;
+  const list = (typeof CARDPACKS !== "undefined" ? CARDPACKS : []).filter((p) => {
+    if (onlyEv && !p.events.length) return false;
+    if (q) {
+      const hay = `${p.title} ${p.theme} ${p.events.map((e) => e.title + " " + e.choices.map((c) => c.text + " " + c.info).join(" ")).join(" ")}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  el("pack-count").textContent = `${list.length}개 / 전체 ${CARDPACKS.length}개`;
+  el("pack-list").innerHTML = list.length
+    ? list.map(packCard).join("")
+    : `<p class="empty">조건에 맞는 카드팩이 없습니다.</p>`;
+}
+function openPackModal(id) {
+  const p = (typeof CARDPACKS !== "undefined" ? CARDPACKS : []).find((x) => x.id === id);
+  if (!p) return;
+  el("pack-modal").querySelector(".sm-body").innerHTML = packDetail(p);
+  el("pack-modal").classList.add("open");
+}
+if (typeof CARDPACKS !== "undefined") {
+  el("pack-search").addEventListener("input", renderPacks);
+  el("pack-only-events").addEventListener("change", renderPacks);
+  el("pack-list").addEventListener("click", (e) => {
+    const card = e.target.closest(".pack-card");
+    if (card) openPackModal(+card.dataset.id);
+  });
+  el("pack-modal-close").addEventListener("click", () => el("pack-modal").classList.remove("open"));
+  el("pack-modal").addEventListener("click", (e) => { if (e.target.id === "pack-modal") el("pack-modal").classList.remove("open"); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") el("pack-modal").classList.remove("open"); });
+  renderPacks();
+}
+
+/* =============================================================
+ *  조합식 (합성 레시피)
+ * ============================================================= */
+const gradeClass = (g) => g.includes("익스트림") ? "ext" : g.includes("하드") ? "hard" : "normal";
+function recipeItem(it, isResult) {
+  const g = it.grade ? `<span class="grade ${gradeClass(it.grade)}">${esc(it.grade)}</span>` : "";
+  return `<div class="recipe-item goto-gift${isResult ? " result" : ""}" data-goto="${escAttr(it.name)}">
+    ${recipeThumb(it)}
+    <div class="ri-name">${esc(it.name)}</div>${g}
+  </div>`;
+}
+function recipeCard(r) {
+  const ings = r.ingredients.map((i) => recipeItem(i)).join('<span class="recipe-op">+</span>');
+  return `<div class="card recipe-card">
+    <div class="recipe-row">
+      ${ings}
+      <span class="recipe-op">=</span>
+      ${recipeItem(r.result, true)}
+    </div>
+  </div>`;
+}
+function renderRecipes() {
+  const q = el("recipe-search").value.trim().toLowerCase();
+  const data = typeof RECIPES !== "undefined" ? RECIPES : [];
+  const list = data.filter((r) => {
+    if (!q) return true;
+    const hay = `${r.result.name} ${r.ingredients.map((i) => i.name).join(" ")}`.toLowerCase();
+    return hay.includes(q);
+  });
+  el("recipe-count").textContent = `${list.length}개 / 전체 ${data.length}개`;
+  el("recipe-list").innerHTML = list.length
+    ? list.map(recipeCard).join("")
+    : `<p class="empty">조건에 맞는 조합식이 없습니다.</p>`;
+}
+if (typeof RECIPES !== "undefined") {
+  el("recipe-search").addEventListener("input", renderRecipes);
+  renderRecipes();
+}
+
+/* =============================================================
+ *  수감자(인격)
+ * ============================================================= */
+if (typeof SINNERS !== "undefined") {
+  fillSelect(el("sinner-char"), [...new Set(SINNERS.map((s) => s.sinner))]);
+  // 연심식 아이콘 토글 버튼 (키워드 / 죄악 / 등급)
+  el("kw-filters").innerHTML = KEYWORDS.map((k) => `<button class="filter-btn" data-val="${esc(k)}"><img class="fb-ic" src="assets/keywords/${encodeURIComponent(k)}.webp" onerror="this.style.display='none'">${esc(k)}</button>`).join("");
+  el("sin-filters").innerHTML = SINS.map((s) => `<button class="filter-btn" data-val="${esc(s)}"><img class="fb-ic" src="assets/sin/${encodeURIComponent(s)}.png" onerror="this.style.display='none'">${esc(s)}</button>`).join("");
+  el("rar-filters").innerHTML = ["0", "00", "000"].map((r) => `<button class="filter-btn" data-val="${r}"><img class="fb-ic" src="assets/ui/rank_0${r.length}.png" onerror="this.style.display='none'">${r}</button>`).join("");
+}
+const activeFilterVal = (id) => { const b = el(id).querySelector(".filter-btn.on"); return b ? b.dataset.val : ""; };
+const sinIcon = (sin) => sin
+  ? `<img class="kwt-ic" src="assets/sin/${encodeURIComponent(sin)}.png" alt="" onerror="this.style.display='none'">` : "";
+
+/* 가챠 카드 (그리드용): 일러스트 + 등급 프레임 + 랭크 배지 + 이름판 */
+function sinGachaCard(s) {
+  const n = s.rarity.length || 1;
+  return `<div class="sin-card" data-id="${s.id}" title="${esc(s.name)} · ${esc(s.title)}">
+    <img class="sc-art" src="${esc(s.art || s.img || "")}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+    <img class="sc-frame" src="assets/ui/frame_0${n}.png" alt="">
+    <img class="sc-rank" src="assets/ui/rank_0${n}.png" alt="" onerror="this.style.display='none'">
+    <div class="sc-name">${esc(s.title)}</div>
+  </div>`;
+}
+
+/* 각성(uptie)별 스킬/패시브 단계 선택 */
+const hpAtLevel = (s, lv) => Math.round(s.hp + s.hpInc * (lv - 1));
+const skillMaxUptie = (s) => Math.max(2, ...(s.skills || []).flatMap((k) => k.levels.map((l) => l.uptie)), ...((s.passives ? [...s.passives.battle, ...s.passives.support] : []).flatMap((p) => p.levels.map((l) => l.uptie))));
+function skillAtUptie(k, U) {
+  const lv = k.levels.filter((l) => l.uptie <= U).slice(-1)[0] || k.levels[0];
+  let { desc, coinDescs } = lv;
+  if (!desc) { const wd = [...k.levels].reverse().find((l) => l.desc); if (wd) { desc = wd.desc; if (!coinDescs.length) coinDescs = wd.coinDescs; } }
+  return { ...lv, desc, coinDescs };
+}
+
+/* 상세(모달용): 큰 일러스트 + 컨트롤 + 스탯 + 패시브 + 스킬 */
+function sinnerDetail(s, uptie, level) {
+  const kws = s.keywords.map((k) => `<span class="badge kw"><img class="kwt-ic" src="assets/keywords/${encodeURIComponent(k)}.webp" onerror="this.style.display='none'">${esc(k)}</span>`).join("");
+  const resist = Object.entries(s.resist || {}).map(([t, v]) => {
+    const cls = v.startsWith("취약") ? "bad" : v.startsWith("저항") ? "good" : "";
+    return `<span class="res ${cls}">${esc(t)} ${esc(v)}</span>`;
+  }).join("");
+  const maxU = skillMaxUptie(s);
+  let uptieBtns = "";
+  for (let u = 1; u <= maxU; u++) uptieBtns += `<button class="uptie-btn${u === uptie ? " on" : ""}" data-u="${u}">${u}</button>`;
+  return `<div class="sm-head">
+      <img class="sm-art" src="${esc(s.art || s.img || "")}" alt="" onerror="this.style.display='none'">
+      <div class="sm-info">
+        <h3>${esc(s.name)} <span class="en">${esc(s.title)}</span></h3>
+        <div class="badges">
+          <img class="rank-badge" src="assets/ui/rank_0${s.rarity.length}.png" alt="${esc(s.rarity)}" title="${esc(s.rarity)} 등급" onerror="this.style.display='none'">
+          ${s.sin ? `<span class="badge sin">${sinIcon(s.sin)}${esc(s.sin)}</span>` : ""}
+          ${kws}
+          <span class="badge">${esc(s.sinner)}</span>
+        </div>
+        <div class="sinner-ctrl">
+          <span class="ctrl-lbl">각성</span><div class="uptie-btns">${uptieBtns}</div>
+          <span class="ctrl-lbl">레벨</span><input type="range" id="lv-slider" min="1" max="45" value="${level}">
+          <span id="lv-val">Lv.${level}</span>
+        </div>
+        <div class="sinner-stats">
+          <span>❤ HP <b id="hp-val">${hpAtLevel(s, level)}</b> <small>(+${s.hpInc}/Lv)</small></span>
+          <span>⚡ 속도 ${s.speedMin}~${s.speedMax}</span>
+          <span>🛡 방어보정 ${s.def > 0 ? "+" : ""}${s.def}</span>
+        </div>
+        <div class="sinner-resist">${resist}</div>
+      </div>
+    </div>
+    ${sinnerPassives(s, uptie)}
+    ${sinnerSkills(s, uptie)}`;
+}
+function sinnerPassives(s, U) {
+  if (!s.passives) return "";
+  const sec = (label, arr) => arr && arr.length
+    ? `<div class="skill"><div class="skill-head"><span class="badge skill-tier">${label}</span></div>
+         ${arr.map((p) => {
+      const active = p.uptie <= U;
+      const lv = p.levels.filter((l) => l.uptie <= U).slice(-1)[0] || p.levels[0];
+      return `<div class="passive${active ? "" : " locked"}"><b>${esc(p.name)}</b>${active ? "" : ` <small class="meta">(각성 ${p.uptie} 필요)</small>`}<div class="skill-desc">${formatEffect(lv.desc)}</div></div>`;
+    }).join("")}</div>` : "";
+  const body = sec("패시브", s.passives.battle) + sec("서포트 패시브", s.passives.support);
+  return body ? `<div class="skills" style="border:none;margin-top:6px;padding-top:4px">${body}</div>` : "";
+}
+function sinnerSkills(s, U) {
+  if (!s.skills || !s.skills.length) return "";
+  const rows = s.skills.map((k) => {
+    const lv = skillAtUptie(k, U);
+    const power = `위력 ${lv.base}${lv.coins ? ` ${lv.scaleStr} (최대 ${lv.max})` : ""}`;
+    const meta = [k.atk, k.sin, power, k.mp ? `자원 ${k.mp}` : ""].filter(Boolean).join(" · ");
+    const coins = (lv.coinDescs || []).map((c) => `<div class="coin-desc">▸ ${highlightKeywords(esc(c))}</div>`).join("");
+    return `<div class="skill">
+      <div class="skill-head"><span class="badge skill-tier">${esc(k.tier)}</span> <b>${esc(k.name || lv.name || "")}</b> <small class="meta">${esc(meta)}</small></div>
+      ${lv.desc ? `<div class="skill-desc">${formatEffect(lv.desc)}</div>` : ""}
+      ${coins}
+    </div>`;
+  }).join("");
+  return `<details class="skills" open><summary>스킬 ${s.skills.length}개</summary>${rows}</details>`;
+}
+const SINNER_ORDER = typeof SINNERS !== "undefined" ? [...new Set(SINNERS.map((s) => s.sinner))] : [];
+function renderSinners() {
+  const q = el("sinner-search").value.trim().toLowerCase();
+  const ch = el("sinner-char").value, sin = activeFilterVal("sin-filters");
+  const kw = activeFilterVal("kw-filters"), rar = activeFilterVal("rar-filters");
+  const data = typeof SINNERS !== "undefined" ? SINNERS : [];
+  const list = data.filter((s) => {
+    if (ch && s.sinner !== ch) return false;
+    if (sin && s.sin !== sin) return false;
+    if (kw && !s.keywords.includes(kw)) return false;
+    if (rar && s.rarity !== rar) return false;
+    if (q && !(`${s.name} ${s.title}`.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  el("sinner-count").textContent = `${list.length}개 / 전체 ${data.length}개`;
+  let html = "";
+  for (const sn of SINNER_ORDER) {
+    const cards = list.filter((s) => s.sinner === sn);
+    if (!cards.length) continue;
+    html += `<div class="sin-group">
+      <div class="sg-head"><img class="sg-icon" src="assets/cat/${encodeURIComponent(sn)}.png" onerror="this.style.display='none'"><b>${esc(sn)}</b><span class="meta">${cards.length}</span></div>
+      <div class="sg-cards">${cards.map(sinGachaCard).join("")}</div>
+    </div>`;
+  }
+  el("sinner-list").innerHTML = html || `<p class="empty">조건에 맞는 인격이 없습니다.</p>`;
+}
+let modalSinner = null, modalUptie = 4, modalLevel = 45;
+function renderSinnerModalBody() {
+  el("sinner-modal").querySelector(".sm-body").innerHTML = sinnerDetail(modalSinner, modalUptie, modalLevel);
+}
+function openSinnerModal(id) {
+  const s = (typeof SINNERS !== "undefined" ? SINNERS : []).find((x) => x.id === id);
+  if (!s) return;
+  modalSinner = s; modalUptie = skillMaxUptie(s); modalLevel = 45;
+  renderSinnerModalBody();
+  el("sinner-modal").classList.add("open");
+}
+function closeSinnerModal() { el("sinner-modal").classList.remove("open"); }
+if (typeof SINNERS !== "undefined") {
+  ["sinner-search", "sinner-char"].forEach((id) => el(id).addEventListener("input", renderSinners));
+  // 필터 버튼 그룹: 단일 선택 토글
+  ["kw-filters", "sin-filters", "rar-filters"].forEach((id) => el(id).addEventListener("click", (e) => {
+    const b = e.target.closest(".filter-btn");
+    if (!b) return;
+    const was = b.classList.contains("on");
+    el(id).querySelectorAll(".filter-btn").forEach((x) => x.classList.remove("on"));
+    if (!was) b.classList.add("on");
+    renderSinners();
+  }));
+  // 모달 내 각성 버튼 / 레벨 슬라이더
+  el("sinner-modal").addEventListener("click", (e) => {
+    const ub = e.target.closest(".uptie-btn");
+    if (ub && modalSinner) { modalUptie = +ub.dataset.u; renderSinnerModalBody(); }
+  });
+  el("sinner-modal").addEventListener("input", (e) => {
+    if (e.target.id === "lv-slider" && modalSinner) {
+      modalLevel = +e.target.value;
+      const hv = el("sinner-modal").querySelector("#hp-val"); if (hv) hv.textContent = hpAtLevel(modalSinner, modalLevel);
+      const lv = el("sinner-modal").querySelector("#lv-val"); if (lv) lv.textContent = "Lv." + modalLevel;
+    }
+  });
+  el("sinner-list").addEventListener("click", (e) => {
+    const card = e.target.closest(".sin-card");
+    if (card) openSinnerModal(+card.dataset.id);
+  });
+  el("sinner-modal-close").addEventListener("click", closeSinnerModal);
+  el("sinner-modal").addEventListener("click", (e) => { if (e.target.id === "sinner-modal") closeSinnerModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSinnerModal(); });
+  renderSinners();
+}
+
+/* =============================================================
+ *  키워드 칩 (파티 추천 / 딜 최적화 공용)
+ * ============================================================= */
+function buildChips(containerId) {
+  const box = el(containerId);
+  KEYWORDS.forEach((k) => {
+    const chip = document.createElement("div");
+    chip.className = "kw-chip";
+    chip.innerHTML = `<img class="fb-ic" src="assets/keywords/${encodeURIComponent(k)}.webp" onerror="this.style.display='none'">${k}`;
+    chip.dataset.kw = k;
+    chip.addEventListener("click", () => chip.classList.toggle("on"));
+    box.appendChild(chip);
+  });
+}
+function selectedChips(containerId) {
+  return [...el(containerId).querySelectorAll(".kw-chip.on")].map((c) => c.dataset.kw);
+}
+buildChips("party-keywords");
+buildChips("damage-keywords");
+
+/* =============================================================
+ *  ③ 파티 빌더 — 인격 선택 → 키워드 분석 → 추천 기프트·카드팩·시너지
+ * ============================================================= */
+const party = [];   // 선택된 인격(최대 6)
+const sinnerById = new Map();
+if (typeof SINNERS !== "undefined") for (const s of SINNERS) sinnerById.set(s.id, s);
+
+function syncChipsToParty() {
+  const present = new Set(party.flatMap((s) => s.keywords));
+  el("party-keywords").querySelectorAll(".kw-chip").forEach((c) => {
+    c.classList.toggle("on", present.has(c.dataset.kw));
+  });
+}
+function renderPartySlots() {
+  const box = el("party-slots");
+  let html = "";
+  for (let i = 0; i < 6; i++) {
+    const s = party[i];
+    if (s) {
+      html += `<div class="pslot filled" data-i="${i}" title="클릭하면 제거">
+         <img src="${esc(s.art || s.img || "")}" alt="" onerror="this.style.visibility='hidden'">
+         <span class="pslot-x">✕</span>
+         <div class="pslot-name">${esc(s.name)}<br><small>${esc(s.title)}</small></div>
+       </div>`;
+    } else {
+      html += `<div class="pslot empty">＋</div>`;
+    }
+  }
+  box.innerHTML = html;
+}
+function partyChanged() { renderPartySlots(); syncChipsToParty(); }
+
+if (typeof SINNERS !== "undefined") {
+  el("party-isearch").addEventListener("input", () => {
+    const q = el("party-isearch").value.trim().toLowerCase();
+    const box = el("party-iresults");
+    if (!q) { box.innerHTML = ""; return; }
+    const ids = new Set(party.map((s) => s.id));
+    const m = SINNERS.filter((s) => !ids.has(s.id) && `${s.name} ${s.title}`.toLowerCase().includes(q)).slice(0, 10);
+    box.innerHTML = m.length ? m.map((s) =>
+      `<div class="iresult" data-id="${s.id}">
+        <img class="ires-art" src="${esc(s.art || s.img || "")}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+        <b>${esc(s.name)}</b> <small>${esc(s.title)}</small>
+        <span class="badge sin">${sinIcon(s.sin)}${esc(s.sin)}</span>${s.keywords.map((k) => `<span class="badge kw"><img class="kwt-ic" src="assets/keywords/${encodeURIComponent(k)}.webp" onerror="this.style.display='none'">${esc(k)}</span>`).join("")}</div>`).join("")
+      : `<div class="meta" style="padding:6px">검색 결과 없음</div>`;
+  });
+  el("party-iresults").addEventListener("click", (e) => {
+    const row = e.target.closest(".iresult");
+    if (!row) return;
+    const s = sinnerById.get(+row.dataset.id);
+    if (s && party.length < 6 && !party.some((p) => p.id === s.id)) { party.push(s); partyChanged(); }
+    el("party-isearch").value = ""; el("party-iresults").innerHTML = "";
+  });
+  el("party-slots").addEventListener("click", (e) => {
+    const slot = e.target.closest(".pslot.filled");
+    if (!slot) return;
+    party.splice(+slot.dataset.i, 1); partyChanged();
+  });
+  renderPartySlots();
+}
+
+function packsForKeywords(keywords) {
+  if (typeof CARDPACKS === "undefined") return [];
+  const giftNames = GIFTS.filter((g) => g.keywords.some((k) => keywords.includes(k))).map((g) => g.name);
+  const out = [];
+  for (const p of CARDPACKS) {
+    if (!p.events.length) continue;
+    const blob = p.events.map((ev) => ev.title + " " + ev.choices.map((c) => `${c.text} ${c.info} ${c.success} ${c.fail}`).join(" ")).join(" ");
+    const hits = [...new Set(giftNames.filter((n) => blob.includes(n)))];
+    if (hits.length) out.push({ p, hits });
+  }
+  return out.sort((a, b) => b.hits.length - a.hits.length).slice(0, 5);
+}
+
+el("party-run").addEventListener("click", () => {
+  const picked = selectedChips("party-keywords");
+  const out = el("party-result");
+  if (!picked.length) {
+    out.innerHTML = `<div class="result-block warn">인격을 선택하거나 키워드를 1개 이상 고르세요.</div>`;
+    return;
+  }
+
+  const scored = GIFTS.map((g) => {
+    const match = g.keywords.filter((k) => picked.includes(k));
+    let score = match.length * 10;
+    if (g.role === "발동" && match.length) score += 5;
+    if (g.role === "증폭" && match.length) score += 3;
+    if (g.tier >= 3) score += 2;
+    return { g, score, match };
+  }).filter((s) => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 12);
+
+  const giftRows = scored.map((s) => `
+    <div class="rank-item rank-flex goto-gift" data-goto="${escAttr(s.g.name)}">
+      ${giftThumb(s.g, "sm")}
+      <div>
+        <span class="score">${s.score}점</span> · <b>${esc(s.g.name)}</b>
+        <span class="badge">${esc(s.g.role)}</span>
+        <small class="meta"> ${s.match.join(", ")}${s.g.cost ? " · 가격 " + s.g.cost : ""}</small>
+      </div>
+    </div>`).join("");
+
+  const packs = packsForKeywords(picked);
+  const packRows = packs.length ? packs.map(({ p, hits }) =>
+    `<div class="rank-item"><b>${esc(p.title)}</b> <span class="badge kw">${esc(p.theme)}</span>
+      <small class="meta"> 층 ${[...new Set(p.floors)].join("·")} · ${p.difficulties.join("/")}</small><br/>
+      <small>이 팩 사건에서: ${hits.slice(0, 6).map(esc).join(", ")}${hits.length > 6 ? " 외" : ""}</small></div>`).join("")
+    : `<p class="meta">키워드 기프트를 주는 고유 사건 팩을 못 찾았습니다. 공용 사건/상점에서 노리세요.</p>`;
+
+  const tips = picked.map((kw) => SYNERGY_RULES[kw]
+    ? `<div class="rank-item"><b>${kw}</b> — ${esc(SYNERGY_RULES[kw].tip)} <small class="meta">(필요 역할: ${SYNERGY_RULES[kw].needs.join("·")})</small></div>` : "").join("");
+
+  out.innerHTML = `
+    <div class="result-block"><h3>① 추천 기프트 <span class="meta">(${picked.join(", ")})</span></h3>
+      <p class="hint">우선순위: <b>${scored.slice(0, 3).map((s) => s.g.name).join(" → ")}</b> · 카드를 누르면 해당 기프트로 이동</p>${giftRows}</div>
+    <div class="result-block"><h3>② 추천 카드팩 (루트)</h3>
+      <p class="hint">파티 키워드 기프트를 주는 사건이 있는 팩입니다. 이 팩을 골라 루트를 짜세요.</p>${packRows}</div>
+    <div class="result-block"><h3>③ 딜 시너지 팁</h3>${tips}</div>`;
+});
+
+/* =============================================================
+ *  ④ 딜 최적화 — 역할 균형 진단
+ * ============================================================= */
+el("damage-run").addEventListener("click", () => {
+  const picked = selectedChips("damage-keywords");
+  const out = el("damage-result");
+  if (!picked.length) {
+    out.innerHTML = `<div class="result-block warn">상태이상을 1개 이상 선택하세요.</div>`;
+    return;
+  }
+
+  const blocks = picked.map((kw) => {
+    const rule = SYNERGY_RULES[kw];
+    const owned = GIFTS.filter((g) => g.keywords.includes(kw));
+    const haveRoles = new Set(owned.map((g) => g.role));
+    const missing = rule ? rule.needs.filter((r) => !haveRoles.has(r)) : [];
+
+    const status = missing.length
+      ? `<span class="warn">⚠ 누락된 역할: ${missing.join(", ")}</span>`
+      : `<span class="ok">✔ 핵심 역할 충족</span>`;
+
+    const list = owned.length
+      ? owned.map((g) => `<div class="rank-item rank-flex">${giftThumb(g, "sm")}<div><b>${esc(g.name)}</b> <span class="badge">${esc(g.role)}</span><br/><small>${esc(g.effect)}</small></div></div>`).join("")
+      : `<p class="empty">데이터에 ${kw} 기프트가 없습니다.</p>`;
+
+    return `<div class="result-block">
+      <h3>${kw}</h3>
+      <p class="hint">${rule ? esc(rule.tip) : ""}</p>
+      <p>${status}</p>
+      ${list}
+    </div>`;
+  }).join("");
+
+  out.innerHTML = blocks;
+});
+
+/* =============================================================
+ *  키워드 툴팁 (마우스 오버 시 설명 표시)
+ * ============================================================= */
+(function () {
+  const tip = document.createElement("div");
+  tip.id = "kwtip";
+  document.body.appendChild(tip);
+  const place = (e) => {
+    const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = e.clientX + pad, y = e.clientY + pad;
+    if (x + w > window.innerWidth - 8) x = e.clientX - w - pad;
+    if (y + h > window.innerHeight - 8) y = e.clientY - h - pad;
+    tip.style.left = x + "px";
+    tip.style.top = y + "px";
+  };
+  document.addEventListener("mouseover", (e) => {
+    const el = e.target.closest && e.target.closest(".kwt[data-desc]");
+    if (!el) return;
+    tip.textContent = el.getAttribute("data-desc");
+    tip.style.display = "block";
+    place(e);
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (tip.style.display === "block") place(e);
+  });
+  document.addEventListener("mouseout", (e) => {
+    if (e.target.closest && e.target.closest(".kwt[data-desc]")) tip.style.display = "none";
+  });
+})();
+
+/* =============================================================
+ *  조합식 아이템 클릭 → 해당 기프트로 이동 + 강조
+ * ============================================================= */
+function gotoGift(name) {
+  const g = giftByName.get(normName(name));
+  if (!g) return;
+  // 기프트 검색 탭으로 전환
+  const tabBtn = document.querySelector('.tab[data-tab="gifts"]');
+  if (tabBtn) tabBtn.click();
+  // 필터 초기화 후 "실제 기프트명"으로 검색 (레시피명과 띄어쓰기가 다를 수 있음)
+  ["gift-sin", "gift-keyword", "gift-role", "gift-tier"].forEach((id) => { if (el(id)) el(id).value = ""; });
+  const s = el("gift-search");
+  s.value = g.name;
+  s.dispatchEvent(new Event("input"));
+  // 렌더 후 해당 카드로 스크롤 + 강조
+  setTimeout(() => {
+    const target = el("gift-list").querySelector(`[data-gname="${normName(g.name)}"]`)
+      || el("gift-list").querySelector(".card");
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.remove("flash");
+    void target.offsetWidth;   // 리플로우로 애니메이션 재시작
+    target.classList.add("flash");
+  }, 30);
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest && e.target.closest(".goto-gift[data-goto]");
+  if (!t) return;
+  gotoGift(t.getAttribute("data-goto"));
+});
+
+/* =============================================================
+ *  썸네일 호버 확대 미리보기
+ * ============================================================= */
+(function () {
+  const zoom = document.createElement("div");
+  zoom.id = "imgzoom";
+  const zimg = document.createElement("img");
+  zoom.appendChild(zimg);
+  document.body.appendChild(zoom);
+  const SEL = "img.pack-ev-thumb, img.zoomable, img.ev-art";
+  const place = (e) => {
+    const pad = 16, w = zoom.offsetWidth, h = zoom.offsetHeight;
+    let x = e.clientX + pad, y = e.clientY + pad;
+    if (x + w > window.innerWidth - 8) x = e.clientX - w - pad;
+    if (y + h > window.innerHeight - 8) y = e.clientY - h - pad;
+    zoom.style.left = Math.max(8, x) + "px";
+    zoom.style.top = Math.max(8, y) + "px";
+  };
+  document.addEventListener("mouseover", (e) => {
+    const t = e.target.closest && e.target.closest(SEL);
+    if (!t || !t.getAttribute("src")) return;
+    zimg.src = t.getAttribute("src");
+    zoom.style.display = "block";
+    place(e);
+  });
+  document.addEventListener("mousemove", (e) => { if (zoom.style.display === "block") place(e); });
+  document.addEventListener("mouseout", (e) => {
+    if (e.target.closest && e.target.closest(SEL)) zoom.style.display = "none";
+  });
+})();
+
+/* =============================================================
+ *  림버스 엠블럼 커서 팔로워 (마우스를 부드럽게 따라옴)
+ * ============================================================= */
+(function () {
+  if (matchMedia("(pointer: coarse)").matches) return;   // 터치 기기 제외
+  const cur = document.createElement("div");
+  cur.id = "limbus-cursor";
+  document.body.appendChild(cur);
+  let mx = window.innerWidth / 2, my = window.innerHeight / 2, x = mx, y = my, shown = false;
+  document.addEventListener("mousemove", (e) => {
+    mx = e.clientX; my = e.clientY;
+    if (!shown) { shown = true; cur.style.opacity = "1"; }
+  });
+  document.addEventListener("mouseleave", () => { cur.style.opacity = "0"; shown = false; });
+  (function loop() {
+    x += (mx - x) * 0.16;
+    y += (my - y) * 0.16;
+    cur.style.transform = `translate(${x + 14}px, ${y + 8}px)`;
+    requestAnimationFrame(loop);
+  })();
+})();

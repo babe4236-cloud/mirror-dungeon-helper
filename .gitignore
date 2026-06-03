@@ -1,0 +1,13 @@
+# OS / 에디터
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 빌드 임시 산출물 (translate-choices.mjs 입력은 유지)
+scripts/_eng_notes.txt
+
+# 로컬 도구 설정
+.claude/
+
+# 의존성 (이 프로젝트는 vanilla — 없음)
+node_modules/

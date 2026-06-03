@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>거울던전 도우미 — 림버스컴퍼니</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1><span class="lc-emblem"></span><span class="lc-title">거울던전 도우미</span></h1>
+    <p class="subtitle">림버스컴퍼니 · 기프트 / 사건 Q&amp;A / 카드팩 / 조합식 / 수감자 / 파티 추천 / 딜 최적화</p>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="gifts">기프트 검색</button>
+    <button class="tab" data-tab="events">사건 Q&amp;A</button>
+    <button class="tab" data-tab="cardpack">카드팩</button>
+    <button class="tab" data-tab="recipe">조합식</button>
+    <button class="tab" data-tab="sinner">수감자</button>
+    <button class="tab" data-tab="party">파티 추천</button>
+    <button class="tab" data-tab="damage">딜 최적화</button>
+  </nav>
+
+  <main class="container">
+    <!-- ① 기프트 검색 -->
+    <section id="tab-gifts" class="panel active">
+      <div class="filters">
+        <input type="search" id="gift-search" placeholder="기프트 이름·효과 검색..." />
+        <select id="gift-sin">
+          <option value="">전체 죄악</option>
+        </select>
+        <select id="gift-keyword">
+          <option value="">전체 키워드</option>
+        </select>
+        <select id="gift-role">
+          <option value="">전체 역할</option>
+          <option value="부여">부여</option>
+          <option value="발동">발동</option>
+          <option value="증폭">증폭</option>
+          <option value="유틸">유틸</option>
+        </select>
+        <select id="gift-tier">
+          <option value="">전체 등급</option>
+        </select>
+      </div>
+      <p class="count" id="gift-count"></p>
+      <div class="cards" id="gift-list"></div>
+    </section>
+
+    <!-- ② 사건 Q&A -->
+    <section id="tab-events" class="panel">
+      <div class="filter-top">
+        <input type="search" id="event-search" class="ys-search" placeholder="사건 이름·선택지 검색..." />
+        <select id="event-theme" class="ys-select">
+          <option value="">전체 테마팩</option>
+        </select>
+      </div>
+      <p class="count" id="event-count"></p>
+      <div id="event-list" class="ev-gallery"></div>
+    </section>
+
+    <!-- 사건 상세 모달 -->
+    <div id="event-modal" class="modal-overlay">
+      <div class="modal-box">
+        <button class="modal-close" id="event-modal-close">✕</button>
+        <div class="sm-body"></div>
+      </div>
+    </div>
+
+    <!-- 카드팩 -->
+    <section id="tab-cardpack" class="panel">
+      <p class="hint">카드팩을 누르면 등장 사건과 그 보상(기프트)을 볼 수 있습니다. 파티 키워드에 맞는 팩을 골라 루트를 짜세요.</p>
+      <div class="filter-top">
+        <input type="search" id="pack-search" class="ys-search" placeholder="카드팩·사건·보상 검색..." />
+        <label class="chk"><input type="checkbox" id="pack-only-events" checked /> 고유 사건 있는 팩만</label>
+      </div>
+      <p class="count" id="pack-count"></p>
+      <div id="pack-list" class="pack-gallery"></div>
+    </section>
+
+    <!-- 카드팩 상세 모달 -->
+    <div id="pack-modal" class="modal-overlay">
+      <div class="modal-box">
+        <button class="modal-close" id="pack-modal-close">✕</button>
+        <div class="sm-body"></div>
+      </div>
+    </div>
+
+    <!-- 조합식 -->
+    <section id="tab-recipe" class="panel">
+      <p class="hint">재료 기프트들을 조합하면 확정으로 얻는 합성 기프트입니다. 난이도(노말/하드/익스트림) 배지로 어느 던전에서 재료가 나오는지 확인하세요.</p>
+      <div class="filters">
+        <input type="search" id="recipe-search" placeholder="조합식·기프트 이름 검색..." />
+      </div>
+      <p class="count" id="recipe-count"></p>
+      <div class="cards" id="recipe-list"></div>
+    </section>
+
+    <!-- 수감자(인격) -->
+    <section id="tab-sinner" class="panel">
+      <div class="sinner-filters">
+        <div class="filter-top">
+          <input type="search" id="sinner-search" class="ys-search" placeholder="인격 이름·수식어 검색..." />
+          <select id="sinner-char" class="ys-select"><option value="">전체 수감자</option></select>
+        </div>
+        <div class="filter-row" id="kw-filters"></div>
+        <div class="filter-row" id="sin-filters"></div>
+        <div class="filter-row" id="rar-filters"></div>
+      </div>
+      <p class="count" id="sinner-count"></p>
+      <div id="sinner-list" class="sinner-groups"></div>
+    </section>
+
+    <!-- 수감자 상세 모달 -->
+    <div id="sinner-modal" class="modal-overlay">
+      <div class="modal-box">
+        <button class="modal-close" id="sinner-modal-close">✕</button>
+        <div class="sm-body"></div>
+      </div>
+    </div>
+
+    <!-- ③ 파티 빌더 -->
+    <section id="tab-party" class="panel">
+      <p class="hint">수감자(인격)를 최대 6명 선택하면 파티 키워드를 분석해 추천 기프트·카드팩·시너지를 보여줍니다. 키워드 칩으로 직접 고를 수도 있습니다.</p>
+      <input type="search" id="party-isearch" class="ys-search" placeholder="인격 이름·수식어로 검색해 추가..." />
+      <div id="party-iresults" class="party-iresults"></div>
+      <div id="party-slots" class="party-slots"></div>
+      <div class="party-kwrow">
+        <span class="ri-label">파티 키워드</span>
+        <div class="keyword-picker" id="party-keywords"></div>
+      </div>
+      <button class="btn" id="party-run">추천 받기</button>
+      <div id="party-result"></div>
+    </section>
+
+    <!-- ④ 딜 최적화 -->
+    <section id="tab-damage" class="panel">
+      <p class="hint">주력 상태이상을 고르면, 부여기·발동기 균형과 누락된 핵심 요소를 점검합니다.</p>
+      <div class="keyword-picker" id="damage-keywords"></div>
+      <button class="btn" id="damage-run">진단하기</button>
+      <div id="damage-result"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>데이터 출처: Limbus Company Wiki · 게임 공식 한국어 · 단테의 달의기억(limbus.haneuk.info). 갱신: <code>scripts/*.mjs</code></span>
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/gifts.gen.js"></script>
+  <script src="js/events.gen.js"></script>
+  <script src="js/cardpacks.gen.js"></script>
+  <script src="js/recipes.gen.js"></script>
+  <script src="js/keywords.gen.js"></script>
+  <script src="js/sinners.gen.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
