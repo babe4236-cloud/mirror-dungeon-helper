@@ -693,9 +693,10 @@ if (typeof SINNERS !== "undefined") {
 /* =============================================================
  *  키워드 칩 (파티 추천 / 딜 최적화 공용)
  * ============================================================= */
-function buildChips(containerId) {
+const ATK_TYPES = ["참격", "관통", "타격"]; // 물리 공격 타입
+function buildChips(containerId, list) {
   const box = el(containerId);
-  KEYWORDS.forEach((k) => {
+  (list || KEYWORDS).forEach((k) => {
     const chip = document.createElement("div");
     chip.className = "kw-chip";
     chip.innerHTML = `<img class="fb-ic" src="assets/keywords/${encodeURIComponent(k)}.webp" onerror="this.style.display='none'">${k}`;
@@ -707,8 +708,14 @@ function buildChips(containerId) {
 function selectedChips(containerId) {
   return [...el(containerId).querySelectorAll(".kw-chip.on")].map((c) => c.dataset.kw);
 }
-buildChips("party-keywords");
+buildChips("party-keywords", [...KEYWORDS, ...ATK_TYPES]);
 buildChips("damage-keywords");
+
+/* 인격의 공격 타입(스킬 atk)·스킬 죄악(공명용) */
+const sinnerAtkTypes = (s) => [...new Set((s.skills || []).map((sk) => sk.atk).filter(Boolean))];
+const sinnerSkillSins = (s) => (s.skills || []).map((sk) => sk.sin).filter(Boolean);
+const idKeywords = (s) => [...new Set([...(s.keywords || []), ...sinnerAtkTypes(s)])];
+const SIN_COLOR = { 분노: "#d0552e", 색욕: "#d98a2b", 나태: "#d9c24a", 탐식: "#7bbf4a", 우울: "#4aa3c8", 오만: "#8a7bd8", 질투: "#c264c2" };
 
 /* =============================================================
  *  ③ 파티 빌더 — 인격 선택 → 키워드 분석 → 추천 기프트·카드팩·시너지
@@ -718,9 +725,10 @@ const sinnerById = new Map();
 if (typeof SINNERS !== "undefined") for (const s of SINNERS) sinnerById.set(s.id, s);
 
 function syncChipsToParty() {
+  // 파티 인격의 상태이상 키워드를 칩에 '추가'로 반영(수동 선택은 지우지 않음)
   const present = new Set(party.flatMap((s) => s.keywords));
   el("party-keywords").querySelectorAll(".kw-chip").forEach((c) => {
-    c.classList.toggle("on", present.has(c.dataset.kw));
+    if (present.has(c.dataset.kw)) c.classList.add("on");
   });
 }
 function renderPartySlots() {
@@ -791,16 +799,52 @@ function recommendSinners(keywords, exclude) {
   const ex = new Set(exclude.map((s) => s.id));
   const rw = { "000": 3, "00": 2, "0": 1 };
   return SINNERS.map((s) => {
-    const match = (s.keywords || []).filter((k) => keywords.includes(k));
+    const match = idKeywords(s).filter((k) => keywords.includes(k));
     return { s, match, score: match.length * 10 + (rw[s.rarity] || 0) };
   }).filter((x) => x.match.length && !ex.has(x.s.id))
     .sort((a, b) => b.score - a.score || b.match.length - a.match.length)
     .slice(0, 12);
 }
 
+/* 죄악 공명 분석 — 파티 스킬의 죄악 분포 */
+function resonanceBlock() {
+  if (!party.length) return "";
+  const cnt = {};
+  party.forEach((s) => sinnerSkillSins(s).forEach((sin) => { cnt[sin] = (cnt[sin] || 0) + 1; }));
+  const sorted = Object.entries(cnt).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length) return "";
+  const max = sorted[0][1];
+  const bars = sorted.map(([sin, c]) => `<div class="res-row">
+      <span class="badge sin" style="min-width:58px">${sinIcon(sin)}${esc(sin)}</span>
+      <div class="res-bar"><div class="res-fill" style="width:${Math.round(c / max * 100)}%;background:${SIN_COLOR[sin] || "#9c6639"}"></div></div>
+      <small class="meta">${c}스킬${c >= 3 ? " · 공명✦" : ""}</small></div>`).join("");
+  const top = sorted[0];
+  const tip = top[1] >= 3
+    ? `<b>${esc(top[0])}</b> 공명이 안정적으로 터집니다(스킬 ${top[1]}개). 같은 죄악 스킬 3개↑면 공명 위력이 강해집니다.`
+    : `죄악이 분산돼 있습니다. 한 죄악 스킬을 3개 이상으로 모으면 공명이 잘 터집니다.`;
+  return `<div class="result-block"><h3>🌀 죄악 공명 분석</h3><p class="hint">${tip}</p>${bars}</div>`;
+}
+
+/* 역할 균형 — 선택 키워드에 대응하는 기프트의 역할 분포 */
+function roleBalanceBlock(picked) {
+  const roles = ["부여", "발동", "증폭", "유틸"];
+  const cnt = Object.fromEntries(roles.map((r) => [r, 0]));
+  MD_GIFTS.forEach((g) => { if (g.keywords.some((k) => picked.includes(k))) cnt[g.role] = (cnt[g.role] || 0) + 1; });
+  const max = Math.max(1, ...roles.map((r) => cnt[r]));
+  const bars = roles.map((r) => `<div class="res-row">
+      <span class="badge" style="min-width:44px;text-align:center">${r}</span>
+      <div class="res-bar"><div class="res-fill" style="width:${Math.round(cnt[r] / max * 100)}%;background:#9c6639"></div></div>
+      <small class="meta">${cnt[r]}개</small></div>`).join("");
+  const warn = (cnt["부여"] === 0 || cnt["발동"] === 0)
+    ? `<p class="hint warn">⚠ 상태이상 딜은 <b>부여</b>(쌓기)와 <b>발동</b>(터뜨리기)이 모두 필요합니다.</p>` : "";
+  return `<div class="result-block"><h3>⚖️ 역할 균형 <span class="meta">(사용 가능 기프트)</span></h3>
+    <p class="hint">부여로 쌓고 발동으로 터뜨리는 균형이 중요합니다.</p>${warn}${bars}</div>`;
+}
+
 el("party-run").addEventListener("click", runPartyRec);
 function runPartyRec() {
-  // 칩 선택 + 이미 담은 파티 인격의 키워드를 합쳐서 분석
+  // 칩 선택 + 이미 담은 파티 인격의 상태이상 키워드를 합쳐서 분석
+  // (공격타입 참격/관통/타격은 칩으로 직접 선택 — 의도치 않은 확산 방지)
   const picked = [...new Set([...selectedChips("party-keywords"), ...party.flatMap((s) => s.keywords)])];
   const out = el("party-result");
   if (!picked.length) {
@@ -857,8 +901,10 @@ function runPartyRec() {
 
   out.innerHTML = `
     ${precBlock}
+    ${resonanceBlock()}
     <div class="result-block"><h3>② 추천 기프트 <span class="meta">(${picked.join(", ")})</span></h3>
       <p class="hint">우선순위: <b>${scored.slice(0, 3).map((s) => s.g.name).join(" → ")}</b> · 카드를 누르면 해당 기프트로 이동</p>${giftRows}</div>
+    ${roleBalanceBlock(picked)}
     <div class="result-block"><h3>③ 추천 카드팩 (루트)</h3>
       <p class="hint">파티 키워드 기프트를 주는 사건이 있는 팩입니다. 이 팩을 골라 루트를 짜세요.</p>${packRows}</div>
     <div class="result-block"><h3>④ 딜 시너지 팁</h3>${tips}</div>`;
@@ -872,6 +918,47 @@ el("party-result").addEventListener("click", (e) => {
     party.push(s); partyChanged(); runPartyRec();
   }
 });
+
+/* 파티 액션: 자동 구성 / 저장 / 공유 / 초기화 + 복원 */
+const PARTY_KEY = "md_party";
+const partyMsg = (t) => { el("party-msg").textContent = t || ""; };
+function loadPartyIds(ids) {
+  party.length = 0;
+  ids.forEach((id) => {
+    const s = sinnerById.get(+id);
+    if (s && party.length < 6 && !party.some((p) => p.id === s.id)) party.push(s);
+  });
+  partyChanged();
+}
+if (typeof SINNERS !== "undefined") {
+  el("party-auto").addEventListener("click", () => {
+    const picked = [...new Set([...selectedChips("party-keywords"), ...party.flatMap((s) => s.keywords)])];
+    if (!picked.length) { partyMsg("키워드를 1개 이상 고른 뒤 자동 구성하세요."); return; }
+    for (const { s } of recommendSinners(picked, party)) { if (party.length >= 6) break; party.push(s); }
+    partyChanged(); runPartyRec(); partyMsg(`상위 추천으로 파티를 채웠습니다 (${party.length}/6).`);
+  });
+  el("party-save").addEventListener("click", () => {
+    try { localStorage.setItem(PARTY_KEY, JSON.stringify(party.map((s) => s.id))); } catch (_) {}
+    partyMsg(`파티 저장됨 (${party.length}명). 다음 방문 때 자동 복원됩니다.`);
+  });
+  el("party-share").addEventListener("click", async () => {
+    if (!party.length) { partyMsg("공유할 인격이 없습니다."); return; }
+    const url = location.origin + location.pathname + "#party=" + party.map((s) => s.id).join(",");
+    try { await navigator.clipboard.writeText(url); partyMsg("공유 링크를 클립보드에 복사했습니다."); }
+    catch (_) { partyMsg(url); }
+  });
+  el("party-clear").addEventListener("click", () => {
+    party.length = 0; partyChanged();
+    el("party-keywords").querySelectorAll(".kw-chip.on").forEach((c) => c.classList.remove("on"));
+    el("party-result").innerHTML = ""; partyMsg("파티를 초기화했습니다.");
+  });
+  // 복원: URL 해시 우선, 없으면 저장값
+  (function restoreParty() {
+    const m = (location.hash || "").match(/party=([\d,]+)/);
+    if (m) { loadPartyIds(m[1].split(",")); partyMsg("공유 링크의 파티를 불러왔습니다."); return; }
+    try { const saved = JSON.parse(localStorage.getItem(PARTY_KEY) || "[]"); if (saved.length) loadPartyIds(saved); } catch (_) {}
+  })();
+}
 
 /* =============================================================
  *  ④ 딜 최적화 — 역할 균형 진단
